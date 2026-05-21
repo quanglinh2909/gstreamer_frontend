@@ -4,6 +4,7 @@ import {
     AlertTriangle,
     Camera as CameraIcon,
     CheckCircle2,
+    ChevronDown,
     CircleDot,
     Clock3,
     Edit3,
@@ -63,10 +64,10 @@ const featureFilters: Array<{ label: string; value: FeatureFilter }> = [
     { label: "Motion", value: "motion" },
 ];
 
-const recordingModes: Array<{ value: string; label: string }> = [
-    { value: "off", label: "Off — no recording" },
-    { value: "always", label: "Always — continuous" },
-    { value: "motion", label: "Motion — motion segments only" },
+const recordingModes: Array<{ label: string; value: string }> = [
+    { label: "Off", value: "off" },
+    { label: "Always", value: "always" },
+    { label: "Motion", value: "motion" },
 ];
 
 const healthStyles: Record<
@@ -201,25 +202,30 @@ function SelectField({
 }: {
     label: string;
     value: string;
-    options: Array<{ value: string; label: string }>;
+    options: Array<{ label: string; value: string }>;
     onChange: (value: string) => void;
 }) {
     return (
-        <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                {label}
-            </span>
-            <select
-                value={value}
-                onChange={(event) => onChange(event.target.value)}
-                className="mt-2 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition-colors focus:border-[#4369ee]"
-            >
-                {options.map((option) => (
-                    <option key={option.value} value={option.value}>
-                        {option.label}
-                    </option>
-                ))}
-            </select>
+        <label className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+            <span className="text-sm font-semibold text-slate-800">{label}</span>
+            <div className="relative">
+                <select
+                    value={value}
+                    onChange={(event) => onChange(event.target.value)}
+                    className="h-6 cursor-pointer appearance-none rounded-md border border-slate-200 bg-white pl-2.5 pr-7 text-sm font-medium text-slate-900 outline-none transition-colors focus:border-[#4369ee]"
+                >
+                    {options.map((option) => (
+                        <option key={option.value} value={option.value}>
+                            {option.label}
+                        </option>
+                    ))}
+                </select>
+                <ChevronDown
+                    size={13}
+                    className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-500"
+                    aria-hidden="true"
+                />
+            </div>
         </label>
     );
 }
@@ -482,7 +488,6 @@ function CameraCard({
 }) {
     const health = getCameraHealth(camera) as CameraHealth;
     const style = healthStyles[health] ?? healthStyles.unknown;
-    const StatusIcon = style.icon;
 
     return (
         <article className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md">
@@ -500,9 +505,9 @@ function CameraCard({
                         <CameraIcon size={28} strokeWidth={2.3} aria-hidden="true" />
                     </div>
                     <p className="mt-3 text-sm font-semibold">Preview unavailable</p>
-                    <p className="mt-1 max-w-full truncate text-xs text-slate-300">
+                    {/* <p className="mt-1 max-w-full truncate text-xs text-slate-300">
                         {camera.outputRtsp || camera.inputRtsp || camera.rtsp || "Waiting for stream"}
-                    </p>
+                    </p> */}
                 </div>
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-4 py-3">
                     <h2 className="truncate text-base font-semibold text-white">
@@ -513,20 +518,7 @@ function CameraCard({
             </div>
 
             <div className="space-y-4 p-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-slate-950">
-                            {camera.status || "Unknown status"}
-                        </p>
-                        <p className="truncate text-xs text-slate-500">
-                            State: {camera.state || "N/A"}
-                        </p>
-                    </div>
-                    <span className={cn("inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold", style.badge)}>
-                        <StatusIcon size={13} strokeWidth={2.4} aria-hidden="true" />
-                        {style.label}
-                    </span>
-                </div>
+
 
                 <div className="flex items-center gap-2">
                     <button
