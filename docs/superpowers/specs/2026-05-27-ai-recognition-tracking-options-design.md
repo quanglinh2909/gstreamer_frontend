@@ -19,7 +19,8 @@ tracker: "bytetrack" | "botsort";
 
 The frontend stores `overlapThreshold` as a percentage from `0` to `100`, as
 it already does for confidence controls. When a legacy backend response does
-not include either new field, the UI defaults to `50%` and `"bytetrack"`.
+not include either new field, the UI defaults to `30%` and `"bytetrack"`.
+Face and license-plate recognition also default `Max FPS` to `5`.
 
 ## Interface
 
