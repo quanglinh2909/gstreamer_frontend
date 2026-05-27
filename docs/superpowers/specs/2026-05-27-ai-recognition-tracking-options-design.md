@@ -45,12 +45,25 @@ settings only.
   `AiFeatureRow`.
 - Face and plate API request interfaces include both new API fields.
 
+## Eager Config Loading
+
+Selecting a camera loads `cameras/{id}/config-ai` immediately, independent of
+the snapshot request, so recognition settings appear without waiting for an
+image. The raw backend config is retained per camera while the snapshot loads.
+
+When the snapshot dimensions become available, the view model rebuilds the
+backend polygon shapes and merges only `shapes` into the current in-memory
+config. This keeps slider, tracker, toggle, and FPS edits made while the image
+was loading instead of replacing them with the earlier server response.
+
 ## Testing
 
 - View-model tests cover defaults, hydration, clamping, tracker fallback, and
   both recognition payloads.
 - Structure/API tests cover the request interfaces, hook wiring, slider, and
   radio controls.
+- View-model and hook-structure tests cover immediate settings hydration and
+  delayed shape-only polygon hydration.
 - Run all Node tests, TypeScript, ESLint, and production build afterward.
 
 ## Scope
