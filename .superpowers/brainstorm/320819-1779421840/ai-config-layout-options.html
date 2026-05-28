@@ -1,0 +1,112 @@
+<h2>Chọn hướng bố trí AI Config</h2>
+<p class="subtitle">Mỗi tab AI chỉ hiện đúng cấu hình của tab đó. Click chọn phương án bạn muốn dùng làm nền.</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="display:grid;grid-template-columns:110px 1fr 150px;gap:10px;height:220px;font-size:11px">
+        <div style="border:1px solid #d5dbea;border-radius:8px;padding:8px;background:#fff">
+          <div class="label">Camera</div>
+          <div style="height:26px;background:#4369ee;border-radius:6px;margin-top:8px"></div>
+          <div style="height:26px;background:#eef2f7;border-radius:6px;margin-top:6px"></div>
+          <div style="height:26px;background:#eef2f7;border-radius:6px;margin-top:6px"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+            <div style="height:28px;background:#4369ee;border-radius:6px"></div>
+            <div style="height:28px;background:#eef2f7;border-radius:6px"></div>
+            <div style="height:28px;background:#eef2f7;border-radius:6px"></div>
+            <div style="height:28px;background:#eef2f7;border-radius:6px"></div>
+          </div>
+          <div style="position:relative;flex:1;border-radius:8px;background:linear-gradient(135deg,#111827,#0f766e);overflow:hidden">
+            <div style="position:absolute;inset:32px 58px;border:3px solid #60a5fa;background:rgba(96,165,250,.16)"></div>
+            <div style="position:absolute;left:52px;right:42px;top:118px;height:3px;background:#f59e0b;transform:rotate(-12deg)"></div>
+          </div>
+        </div>
+        <div style="border:1px solid #d5dbea;border-radius:8px;padding:8px;background:#fff">
+          <div class="label">Khuôn mặt</div>
+          <div style="display:flex;justify-content:space-between;margin-top:10px"><span>Bật/tắt</span><span style="width:28px;height:16px;border-radius:999px;background:#4369ee"></span></div>
+          <div style="height:8px;background:#dbeafe;border-radius:99px;margin-top:18px"></div>
+          <div style="height:8px;background:#dbeafe;border-radius:99px;margin-top:16px"></div>
+          <div style="height:30px;background:#111827;border-radius:6px;margin-top:16px"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. Camera - Preview - Panel</h3>
+      <p>Giữ bố cục hiện tại: trái chọn camera, giữa preview + tab AI, phải panel cấu hình tab đang chọn. Ít rủi ro, dễ mở rộng.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="display:grid;grid-template-columns:1fr 230px;gap:10px;height:220px;font-size:11px">
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+            <div style="height:26px;background:#4369ee;border-radius:6px"></div>
+            <div style="height:26px;background:#eef2f7;border-radius:6px"></div>
+            <div style="height:26px;background:#eef2f7;border-radius:6px"></div>
+            <div style="height:26px;background:#eef2f7;border-radius:6px"></div>
+          </div>
+          <div style="position:relative;flex:1;border-radius:8px;background:linear-gradient(135deg,#0f172a,#164e63);overflow:hidden">
+            <div style="position:absolute;inset:28px 70px 44px 44px;border:3px solid #60a5fa;background:rgba(96,165,250,.16)"></div>
+            <div style="position:absolute;left:42px;right:52px;top:110px;height:3px;background:#f59e0b;transform:rotate(-8deg)"></div>
+          </div>
+          <div style="height:34px;border:1px solid #d5dbea;border-radius:8px;background:#fff"></div>
+        </div>
+        <div style="border:1px solid #d5dbea;border-radius:8px;padding:8px;background:#fff">
+          <div class="label">Camera + cấu hình</div>
+          <div style="height:30px;background:#eef2f7;border-radius:6px;margin-top:8px"></div>
+          <div style="height:1px;background:#e2e8f0;margin:12px 0"></div>
+          <div style="height:16px;background:#4369ee;border-radius:999px;width:42px"></div>
+          <div style="height:8px;background:#dbeafe;border-radius:99px;margin-top:18px"></div>
+          <div style="height:8px;background:#dbeafe;border-radius:99px;margin-top:16px"></div>
+          <div style="height:30px;background:#111827;border-radius:6px;margin-top:16px"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. Preview rộng, panel gom camera</h3>
+      <p>Ưu tiên không gian vẽ lớn. Chọn camera nằm chung bên phải với cấu hình. Tốt nếu thao tác vẽ là trọng tâm nhất.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="display:grid;grid-template-columns:150px 1fr;gap:10px;height:220px;font-size:11px">
+        <div style="border:1px solid #d5dbea;border-radius:8px;padding:8px;background:#fff">
+          <div class="label">Bước</div>
+          <div style="height:30px;background:#4369ee;border-radius:6px;margin-top:8px"></div>
+          <div style="height:30px;background:#eef2f7;border-radius:6px;margin-top:8px"></div>
+          <div style="height:30px;background:#eef2f7;border-radius:6px;margin-top:8px"></div>
+          <div style="height:30px;background:#eef2f7;border-radius:6px;margin-top:8px"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="height:42px;border:1px solid #d5dbea;border-radius:8px;background:#fff"></div>
+          <div style="position:relative;flex:1;border-radius:8px;background:linear-gradient(135deg,#111827,#14532d);overflow:hidden">
+            <div style="position:absolute;inset:38px 92px 48px 80px;border:3px solid #60a5fa;background:rgba(96,165,250,.16)"></div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <div style="width:70px;height:30px;background:#eef2f7;border-radius:6px"></div>
+            <div style="width:70px;height:30px;background:#111827;border-radius:6px"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. Wizard từng bước</h3>
+      <p>Dẫn người dùng đi theo bước: chọn camera, chọn AI, bật/tắt, vẽ vùng. Dễ học nhưng chậm hơn khi cấu hình nhiều camera.</p>
+    </div>
+  </div>
+</div>
+
+<div class="pros-cons">
+  <div class="pros">
+    <h4>Khuyến nghị</h4>
+    <ul><li>Chọn A: gần code hiện tại, rõ ràng cho từng tab, vẫn đủ chỗ cho preview và danh sách vùng.</li></ul>
+  </div>
+  <div class="cons">
+    <h4>Lưu ý</h4>
+    <ul><li>B và C chỉ đáng chọn nếu bạn muốn đổi workflow lớn hơn, không chỉ nâng cấp AI Config hiện có.</li></ul>
+  </div>
+</div>
