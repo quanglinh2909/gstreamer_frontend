@@ -84,7 +84,7 @@ test("getCameraFormDefaults maps a camera into editable form values", () => {
       rtsp: "rtsp://camera/front",
       hardware: "nvidia",
       recordingEnabled: true,
-      recordingMode: "continuous",
+      recordingMode: "always",
       motionEnabled: true,
       motionSensitivity: 74,
       motionThreshold: 21,
@@ -98,7 +98,7 @@ test("getCameraFormDefaults maps a camera into editable form values", () => {
       rtsp: "rtsp://camera/front",
       hardware: "nvidia",
       recordingEnabled: true,
-      recordingMode: "continuous",
+      recordingMode: "always",
       motionEnabled: true,
       motionSensitivity: "74",
       motionThreshold: "21",
@@ -147,8 +147,16 @@ test("getCameraFormDefaults defaults recordingMode to off when missing or blank"
   assert.equal(getCameraFormDefaults().recordingMode, "off");
   assert.equal(getCameraFormDefaults({ recordingMode: "" }).recordingMode, "off");
   assert.equal(getCameraFormDefaults({ recordingMode: "   " }).recordingMode, "off");
+  assert.equal(getCameraFormDefaults({ recordingMode: "continuous" }).recordingMode, "off");
   assert.equal(
     getCameraFormDefaults({ recordingMode: "motion" }).recordingMode,
     "motion",
   );
+});
+
+test("getCameraFormDefaults defaults hardware to auto when missing or blank", () => {
+  assert.equal(getCameraFormDefaults().hardware, "auto");
+  assert.equal(getCameraFormDefaults({ hardware: "" }).hardware, "auto");
+  assert.equal(getCameraFormDefaults({ hardware: "   " }).hardware, "auto");
+  assert.equal(getCameraFormDefaults({ hardware: "nvidia" }).hardware, "nvidia");
 });

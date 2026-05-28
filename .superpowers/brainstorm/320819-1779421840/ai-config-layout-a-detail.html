@@ -1,0 +1,101 @@
+<h2>Phương án A chi tiết</h2>
+<p class="subtitle">Mỗi tab chỉ hiện cấu hình riêng của AI đang chọn. Đây là bố cục mình đề xuất triển khai.</p>
+
+<div class="mockup">
+  <div class="mockup-header">AI Config / Camera 01 / Tab Khuôn mặt</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:220px minmax(420px,1fr) 340px;gap:14px;min-height:520px;font-family:system-ui">
+      <aside style="border:1px solid #dbe2ee;border-radius:8px;background:#fff;overflow:hidden">
+        <div style="padding:12px;border-bottom:1px solid #e5eaf2">
+          <div class="label">Camera</div>
+          <strong style="font-size:14px">Chọn camera</strong>
+        </div>
+        <div style="padding:10px;display:grid;gap:8px">
+          <div style="display:flex;gap:10px;align-items:center;border:1px solid #4369ee;background:#eff6ff;border-radius:8px;padding:10px">
+            <div style="width:28px;height:28px;border-radius:7px;background:#4369ee"></div>
+            <div>
+              <div style="height:10px;width:94px;background:#1e293b;border-radius:99px"></div>
+              <div style="height:8px;width:70px;background:#94a3b8;border-radius:99px;margin-top:7px"></div>
+            </div>
+          </div>
+          <div style="height:50px;border-radius:8px;background:#f8fafc"></div>
+          <div style="height:50px;border-radius:8px;background:#f8fafc"></div>
+        </div>
+      </aside>
+
+      <section style="min-width:0">
+        <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:10px">
+          <button class="mock-button" style="background:#4369ee;color:white">Khuôn mặt</button>
+          <button class="mock-button" style="background:#f1f5f9;color:#475569">Biển số</button>
+          <button class="mock-button" style="background:#f1f5f9;color:#475569">Xâm nhập</button>
+          <button class="mock-button" style="background:#f1f5f9;color:#475569">Hàng rào ảo</button>
+        </div>
+
+        <div style="position:relative;aspect-ratio:16/9;border:1px solid #020617;border-radius:8px;overflow:hidden;background:linear-gradient(135deg,#020617,#111827 48%,#064e3b)">
+          <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.08) 1px,transparent 1px);background-size:38px 38px"></div>
+          <div style="position:absolute;left:15%;top:24%;width:26%;height:34%;border:3px solid #38bdf8;background:rgba(56,189,248,.15);clip-path:polygon(12% 0,100% 14%,88% 100%,0 84%)"></div>
+          <div style="position:absolute;left:15%;top:24%;width:8px;height:8px;border-radius:50%;background:white;border:2px solid #38bdf8"></div>
+          <div style="position:absolute;left:41%;top:29%;width:8px;height:8px;border-radius:50%;background:white;border:2px solid #38bdf8"></div>
+          <div style="position:absolute;left:38%;top:58%;width:8px;height:8px;border-radius:50%;background:white;border:2px solid #38bdf8"></div>
+          <div style="position:absolute;left:15%;top:53%;width:8px;height:8px;border-radius:50%;background:white;border:2px solid #38bdf8"></div>
+          <div style="position:absolute;left:55%;top:62%;width:34%;height:3px;background:#f59e0b;transform:rotate(-10deg)"></div>
+          <div style="position:absolute;left:55%;top:62%;width:8px;height:8px;border-radius:50%;background:white;border:2px solid #f59e0b"></div>
+          <div style="position:absolute;right:11%;top:55%;width:8px;height:8px;border-radius:50%;background:white;border:2px solid #f59e0b"></div>
+          <div style="position:absolute;left:14px;top:14px;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.35);color:white;border-radius:999px;padding:5px 10px;font-size:12px">online</div>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;color:#64748b;font-size:13px">
+          <span>Click để thêm điểm. Click phải vào điểm để xoá. Giữ chuột trái trên vùng/đường để di chuyển.</span>
+          <strong style="color:#334155">3 vùng / 2 hàng rào</strong>
+        </div>
+      </section>
+
+      <aside style="border:1px solid #dbe2ee;border-radius:8px;background:#fff;overflow:hidden">
+        <div style="padding:12px;border-bottom:1px solid #e5eaf2">
+          <div class="label">Tab đang chọn</div>
+          <strong style="font-size:14px">Khuôn mặt</strong>
+        </div>
+        <div style="padding:14px;display:grid;gap:14px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:13px;font-weight:700;color:#0f172a">Bật nhận diện</span>
+            <span style="width:44px;height:24px;background:#4369ee;border-radius:999px;position:relative"><span style="position:absolute;right:4px;top:4px;width:16px;height:16px;border-radius:50%;background:white"></span></span>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:#64748b"><span>Tỷ lệ nhận diện khuôn mặt</span><span style="color:#0f172a">72%</span></div>
+            <div style="height:8px;background:#dbeafe;border-radius:999px;margin-top:9px"><div style="width:72%;height:100%;background:#4369ee;border-radius:999px"></div></div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:#64748b"><span>Tỷ lệ xác minh khuôn mặt</span><span style="color:#0f172a">84%</span></div>
+            <div style="height:8px;background:#dbeafe;border-radius:999px;margin-top:9px"><div style="width:84%;height:100%;background:#10b981;border-radius:999px"></div></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <button class="mock-button" style="background:#111827;color:white">Thêm vùng</button>
+            <button class="mock-button" style="background:#f1f5f9;color:#475569">Xóa nháp</button>
+          </div>
+          <div style="border-top:1px solid #e5eaf2;padding-top:10px">
+            <div class="label">Vùng nhận diện</div>
+            <div style="height:38px;border:1px solid #e2e8f0;border-radius:8px;margin-top:8px;background:#f8fafc"></div>
+            <div style="height:38px;border:1px solid #e2e8f0;border-radius:8px;margin-top:8px;background:#f8fafc"></div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="layout-ok" onclick="toggleSelect(this)">
+    <div class="letter">✓</div>
+    <div class="content">
+      <h3>Bố cục này ổn</h3>
+      <p>Tiếp tục thiết kế data model và interaction dựa trên bố cục này.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="layout-change" onclick="toggleSelect(this)">
+    <div class="letter">↻</div>
+    <div class="content">
+      <h3>Cần chỉnh bố cục</h3>
+      <p>Ví dụ đổi vị trí tab, danh sách vùng, hoặc kích thước panel.</p>
+    </div>
+  </div>
+</div>

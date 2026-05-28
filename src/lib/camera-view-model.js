@@ -141,13 +141,29 @@ function fieldToNumber(value) {
   return numeric;
 }
 
+const recordingModeValues = new Set(["off", "always", "motion"]);
+
+function normalizeRecordingMode(value) {
+  const mode = asText(value);
+
+  if (recordingModeValues.has(mode)) {
+    return mode;
+  }
+
+  return "off";
+}
+
+function normalizeHardware(value) {
+  return asText(value) || "auto";
+}
+
 function getCameraFormDefaults(camera = {}) {
   return {
     name: asText(camera.name),
     rtsp: asText(camera.rtsp),
-    hardware: asText(camera.hardware),
+    hardware: normalizeHardware(camera.hardware),
     recordingEnabled: Boolean(camera.recordingEnabled),
-    recordingMode: asText(camera.recordingMode) || "off",
+    recordingMode: normalizeRecordingMode(camera.recordingMode),
     motionEnabled: Boolean(camera.motionEnabled),
     motionSensitivity: numberToField(camera.motionSensitivity),
     motionThreshold: numberToField(camera.motionThreshold),
@@ -162,9 +178,9 @@ function buildCameraPayload(form) {
   return {
     name: asText(form.name),
     rtsp: asText(form.rtsp),
-    hardware: asText(form.hardware),
+    hardware: normalizeHardware(form.hardware),
     recordingEnabled: Boolean(form.recordingEnabled),
-    recordingMode: asText(form.recordingMode),
+    recordingMode: normalizeRecordingMode(form.recordingMode),
     motionEnabled: Boolean(form.motionEnabled),
     motionSensitivity: fieldToNumber(form.motionSensitivity),
     motionThreshold: fieldToNumber(form.motionThreshold),
