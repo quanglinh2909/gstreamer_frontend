@@ -11,6 +11,7 @@ import {
     Plus,
     ScanLine,
     Search,
+    ParkingMeter,
     Settings,
     SquareParking,
     SquarePlay,
@@ -33,6 +34,7 @@ const mainItems: MenuItem[] = [
     { label: "Identities", icon: ContactRound, href: "/identities" },
     { label: "Plate Whitelist", icon: ListStart, href: "/plate-white-list" },
     { label: "Parking Lots", icon: SquareParking, href: "/parking-lot" },
+    { label: "Parking Events", icon: ParkingMeter, href: "/parking-lot-events" },
 
 ];
 
