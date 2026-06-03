@@ -1,4 +1,9 @@
-import type { Identity, IdentityPage } from "@/interface/identity";
+import type {
+    Identity,
+    IdentityPage,
+    IdentityPlate,
+    IdentityPlatePayload,
+} from "@/interface/identity";
 import backendClient from "./backend-api";
 
 export const identityApi = {
@@ -20,5 +25,21 @@ export const identityApi = {
 
     delete(id: number) {
         return backendClient.delete(`identities/${id}`);
+    },
+
+    listPlates(identityId: number) {
+        return backendClient.get<IdentityPlate[]>(`identities/${identityId}/plates`);
+    },
+
+    createPlate(identityId: number, data: IdentityPlatePayload) {
+        return backendClient.post<IdentityPlate>(`identities/${identityId}/plates`, data);
+    },
+
+    updatePlate(plateId: number, data: IdentityPlatePayload) {
+        return backendClient.put<IdentityPlate>(`identities/plates/${plateId}`, data);
+    },
+
+    deletePlate(plateId: number) {
+        return backendClient.delete(`identities/plates/${plateId}`);
     },
 };

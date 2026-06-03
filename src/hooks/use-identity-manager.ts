@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { identityApi } from "@/backend-api/identity-api";
-import type { Identity, IdentityPage } from "@/interface/identity";
+import type { Identity, IdentityPage, IdentityPlate } from "@/interface/identity";
 import {
     buildIdentityFormData,
     getIdentityFormError,
@@ -72,6 +72,7 @@ function createIdentityForm(identity?: Identity | null): IdentityFormState {
 
 export function useIdentityManager() {
     const detailRequestRef = useRef(0);
+    const platesRequestRef = useRef(0);
     const formPreviewUrlRef = useRef("");
     const [identityPage, setIdentityPage] = useState<IdentityPage>(() => emptyIdentityPage());
     const [searchText, setSearchText] = useState("");
@@ -92,6 +93,15 @@ export function useIdentityManager() {
     const [deleteTarget, setDeleteTarget] = useState<Identity | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteErrorMessage, setDeleteErrorMessage] = useState("");
+    const [plates, setPlates] = useState<IdentityPlate[]>([]);
+    const [isPlatesLoading, setIsPlatesLoading] = useState(false);
+    const [platesErrorMessage, setPlatesErrorMessage] = useState("");
+    const [newPlateNumber, setNewPlateNumber] = useState("");
+    const [isAddingPlate, setIsAddingPlate] = useState(false);
+    const [editingPlateId, setEditingPlateId] = useState<number | null>(null);
+    const [editingPlateNumber, setEditingPlateNumber] = useState("");
+    const [isSavingPlate, setIsSavingPlate] = useState(false);
+    const [deletingPlateId, setDeletingPlateId] = useState<number | null>(null);
 
     const clearFormPreview = () => {
         if (formPreviewUrlRef.current) {
@@ -177,12 +187,50 @@ export function useIdentityManager() {
         setSubmittedName("");
     };
 
+    const resetPlateState = () => {
+        platesRequestRef.current += 1;
+        setPlates([]);
+        setIsPlatesLoading(false);
+        setPlatesErrorMessage("");
+        setNewPlateNumber("");
+        setIsAddingPlate(false);
+        setEditingPlateId(null);
+        setEditingPlateNumber("");
+        setIsSavingPlate(false);
+        setDeletingPlateId(null);
+    };
+
+    const loadPlates = async (identityId: number) => {
+        const requestId = platesRequestRef.current + 1;
+        platesRequestRef.current = requestId;
+        setIsPlatesLoading(true);
+        setPlatesErrorMessage("");
+
+        try {
+            const { data } = await identityApi.listPlates(identityId);
+
+            if (platesRequestRef.current === requestId) {
+                setPlates(Array.isArray(data) ? data : []);
+            }
+        } catch (error) {
+            if (platesRequestRef.current === requestId) {
+                setPlatesErrorMessage(getErrorMessage(error, "Không thể tải danh sách phương tiện."));
+            }
+        } finally {
+            if (platesRequestRef.current === requestId) {
+                setIsPlatesLoading(false);
+            }
+        }
+    };
+
     const openIdentityDetail = async (identity: Identity) => {
         const requestId = detailRequestRef.current + 1;
         detailRequestRef.current = requestId;
         setSelectedIdentity(identity);
         setIsDetailLoading(true);
         setDetailErrorMessage("");
+        resetPlateState();
+        void loadPlates(identity.id);
 
         try {
             const { data } = await identityApi.detail(identity.id);
@@ -206,6 +254,96 @@ export function useIdentityManager() {
         setSelectedIdentity(null);
         setIsDetailLoading(false);
         setDetailErrorMessage("");
+        resetPlateState();
+    };
+
+    const addPlate = async () => {
+        if (!selectedIdentity) {
+            return;
+        }
+
+        const plateNumber = newPlateNumber.trim();
+
+        if (!plateNumber) {
+            setPlatesErrorMessage("Vui lòng nhập biển số phương tiện.");
+            return;
+        }
+
+        setIsAddingPlate(true);
+        setPlatesErrorMessage("");
+
+        try {
+            await identityApi.createPlate(selectedIdentity.id, { plate_number: plateNumber });
+            setNewPlateNumber("");
+            await loadPlates(selectedIdentity.id);
+        } catch (error) {
+            setPlatesErrorMessage(getErrorMessage(error, "Không thể thêm phương tiện."));
+        } finally {
+            setIsAddingPlate(false);
+        }
+    };
+
+    const startEditPlate = (plate: IdentityPlate) => {
+        setEditingPlateId(plate.id);
+        setEditingPlateNumber(plate.plate_number);
+        setPlatesErrorMessage("");
+    };
+
+    const cancelEditPlate = () => {
+        setEditingPlateId(null);
+        setEditingPlateNumber("");
+    };
+
+    const saveEditPlate = async () => {
+        if (editingPlateId === null) {
+            return;
+        }
+
+        const plateNumber = editingPlateNumber.trim();
+
+        if (!plateNumber) {
+            setPlatesErrorMessage("Vui lòng nhập biển số phương tiện.");
+            return;
+        }
+
+        setIsSavingPlate(true);
+        setPlatesErrorMessage("");
+
+        try {
+            await identityApi.updatePlate(editingPlateId, { plate_number: plateNumber });
+            setEditingPlateId(null);
+            setEditingPlateNumber("");
+
+            if (selectedIdentity) {
+                await loadPlates(selectedIdentity.id);
+            }
+        } catch (error) {
+            setPlatesErrorMessage(getErrorMessage(error, "Không thể cập nhật phương tiện."));
+        } finally {
+            setIsSavingPlate(false);
+        }
+    };
+
+    const deletePlate = async (plateId: number) => {
+        setDeletingPlateId(plateId);
+        setPlatesErrorMessage("");
+
+        try {
+            await identityApi.deletePlate(plateId);
+
+            if (editingPlateId === plateId) {
+                setEditingPlateId(null);
+                setEditingPlateNumber("");
+            }
+
+            if (selectedIdentity) {
+                await loadPlates(selectedIdentity.id);
+            }
+        } catch (error) {
+            setPlatesErrorMessage(getErrorMessage(error, "Không thể xóa phương tiện."));
+        } finally {
+            setDeletingPlateId(null);
+        }
     };
 
     const openCreateIdentity = () => {
@@ -321,6 +459,8 @@ export function useIdentityManager() {
     };
 
     return {
+        addPlate,
+        cancelEditPlate,
         clearSearch,
         closeDeleteIdentity,
         closeIdentityDetail,
@@ -328,9 +468,13 @@ export function useIdentityManager() {
         confirmDeleteIdentity,
         currentPage,
         deleteErrorMessage,
+        deletePlate,
         deleteTarget,
+        deletingPlateId,
         detailErrorMessage,
         editTarget,
+        editingPlateId,
+        editingPlateNumber,
         errorMessage,
         form,
         formErrorMessage,
@@ -338,22 +482,32 @@ export function useIdentityManager() {
         handleFormSubmit,
         handleSearchSubmit,
         identityPage,
+        isAddingPlate,
         isDeleting,
         isDetailLoading,
         isFormOpen,
         isLoading,
+        isPlatesLoading,
         isSaving,
+        isSavingPlate,
+        newPlateNumber,
         openCreateIdentity,
         openDeleteIdentity,
         openEditIdentity,
         openIdentityDetail,
+        plates,
+        platesErrorMessage,
         refreshIdentities,
+        saveEditPlate,
         searchText,
         selectedIdentity,
         setCurrentPage,
+        setEditingPlateNumber,
         setFormImage,
         setFormName,
+        setNewPlateNumber,
         setSearchText,
+        startEditPlate,
         submittedName,
     };
 }

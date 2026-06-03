@@ -12,6 +12,7 @@ import {
     ScanLine,
     Search,
     Settings,
+    SquareParking,
     SquarePlay,
     Video,
     ListStart,
@@ -31,6 +32,7 @@ const mainItems: MenuItem[] = [
     { label: "Events", icon: History, href: "/events" },
     { label: "Identities", icon: ContactRound, href: "/identities" },
     { label: "Plate Whitelist", icon: ListStart, href: "/plate-white-list" },
+    { label: "Parking Lots", icon: SquareParking, href: "/parking-lot" },
 
 ];
 

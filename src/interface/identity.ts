@@ -12,3 +12,13 @@ export interface IdentityPage {
     size: number;
     pages: number;
 }
+
+export interface IdentityPlate {
+    id: number;
+    identity_id: number;
+    plate_number: string;
+}
+
+export interface IdentityPlatePayload {
+    plate_number: string;
+}
