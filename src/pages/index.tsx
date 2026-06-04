@@ -1,16 +1,26 @@
-import Image from "next/image";
-import { Geist, Geist_Mono } from "next/font/google";
-import { MainLayout } from "../components/layouts/main-layout";
+import type { GetServerSideProps, InferGetServerSidePropsType } from "next";
+import { Dashboard } from "@/components/dashboard/dashboard";
+import { MainLayout } from "@/components/layouts/main-layout";
+import { useDashboardManager } from "@/hooks/use-dashboard-manager";
 
+interface DashboardPageProps {
+    websocketOrigin: string;
+}
 
-export default function Home() {
+export const getServerSideProps: GetServerSideProps<DashboardPageProps> = async () => ({
+    props: {
+        websocketOrigin: process.env.WEBSOCKET_ORIGIN ?? "",
+    },
+});
+
+export default function Home({
+    websocketOrigin,
+}: InferGetServerSidePropsType<typeof getServerSideProps>) {
+    const manager = useDashboardManager(websocketOrigin);
+
     return (
         <MainLayout>
-            <div
-                className={`flex min-h-screen flex-col items-center justify-between p-24`}
-            >
-                <h1 className="text-4xl font-bold">Hello, World!</h1>
-            </div>
+            <Dashboard manager={manager} />
         </MainLayout>
     );
 }
