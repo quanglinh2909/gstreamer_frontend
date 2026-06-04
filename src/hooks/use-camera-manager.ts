@@ -1,6 +1,10 @@
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { cameraApi } from "@/backend-api/camera-api";
-import type { ICameraCreate, ICameraResponse } from "@/interface/camera";
+import type {
+    CameraStateMessage,
+    ICameraCreate,
+    ICameraResponse,
+} from "@/interface/camera";
 import {
     buildCameraPayload,
     filterCameras,
@@ -14,6 +18,15 @@ import type {
     StatusFilter,
 } from "@/components/camera/types";
 
+export type CameraSocketStatus =
+    | "idle"
+    | "connecting"
+    | "connected"
+    | "reconnecting"
+    | "error";
+
+const MAX_RECONNECT_DELAY = 5000;
+
 function getApiErrorMessage(error: unknown) {
     if (error instanceof Error) {
         return error.message;
@@ -26,7 +39,30 @@ function asCameraList(data: unknown): ICameraResponse[] {
     return Array.isArray(data) ? data : [];
 }
 
-export function useCameraManager() {
+function parseCameraStateMessage(raw: unknown): CameraStateMessage | null {
+    if (typeof raw !== "string") {
+        return null;
+    }
+
+    try {
+        const value = JSON.parse(raw) as Partial<CameraStateMessage>;
+
+        if (typeof value?.id !== "string" || typeof value.state !== "string") {
+            return null;
+        }
+
+        return {
+            id: value.id,
+            state: value.state,
+            lastError: typeof value.lastError === "string" ? value.lastError : "",
+            lastChangedAt: typeof value.lastChangedAt === "string" ? value.lastChangedAt : "",
+        };
+    } catch {
+        return null;
+    }
+}
+
+export function useCameraManager(websocketOrigin = "") {
     const [cameras, setCameras] = useState<ICameraResponse[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState("");
@@ -45,6 +81,7 @@ export function useCameraManager() {
     const [deleteTarget, setDeleteTarget] = useState<ICameraResponse | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteErrorMessage, setDeleteErrorMessage] = useState("");
+    const [socketStatus, setSocketStatus] = useState<CameraSocketStatus>("idle");
 
     const fetchCameras = useCallback(async () => {
         setIsLoading(true);
@@ -68,6 +105,107 @@ export function useCameraManager() {
 
         return () => window.clearTimeout(timer);
     }, [fetchCameras]);
+
+    const handleStateMessage = useCallback((raw: unknown) => {
+        const message = parseCameraStateMessage(raw);
+
+        if (!message) {
+            return;
+        }
+
+        setCameras((previous) => {
+            let changed = false;
+
+            const next = previous.map((camera) => {
+                if (camera.id !== message.id) {
+                    return camera;
+                }
+
+                changed = true;
+
+                // The pushed `state` is authoritative; mirror it into `status`
+                // too so the stale REST `status` can't mask it in health checks.
+                return {
+                    ...camera,
+                    status: message.state,
+                    state: message.state,
+                    lastError: message.lastError,
+                    lastChangedAt: message.lastChangedAt || camera.lastChangedAt,
+                };
+            });
+
+            return changed ? next : previous;
+        });
+
+        setLastUpdated(new Date());
+    }, []);
+
+    useEffect(() => {
+        if (typeof window === "undefined") {
+            return;
+        }
+
+        const baseUrl = websocketOrigin.trim().replace(/\/+$/, "");
+        const url = `${baseUrl}/camera-state`;
+        let socket: WebSocket | null = null;
+        let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+        let attempts = 0;
+        let disposed = false;
+
+        const connect = () => {
+            if (disposed) {
+                return;
+            }
+
+            setSocketStatus(attempts === 0 ? "connecting" : "reconnecting");
+
+            try {
+                socket = new WebSocket(url);
+            } catch {
+                setSocketStatus("error");
+                return;
+            }
+
+            socket.onopen = () => {
+                attempts = 0;
+                setSocketStatus("connected");
+            };
+
+            socket.onmessage = (event) => handleStateMessage(event.data);
+
+            socket.onerror = () => setSocketStatus("error");
+
+            socket.onclose = () => {
+                if (disposed) {
+                    return;
+                }
+
+                attempts += 1;
+                const delay = Math.min(1000 * 2 ** (attempts - 1), MAX_RECONNECT_DELAY);
+                setSocketStatus("reconnecting");
+                reconnectTimer = setTimeout(connect, delay);
+            };
+        };
+
+        // Deferred so the effect doesn't call setState synchronously.
+        const startTimer = window.setTimeout(() => {
+            if (!baseUrl) {
+                setSocketStatus("idle");
+                return;
+            }
+            connect();
+        }, 0);
+
+        return () => {
+            disposed = true;
+            window.clearTimeout(startTimer);
+            if (reconnectTimer) {
+                clearTimeout(reconnectTimer);
+            }
+            socket?.close();
+            setSocketStatus("idle");
+        };
+    }, [websocketOrigin, handleStateMessage]);
 
     const stats = useMemo(() => getCameraStats(cameras), [cameras]);
     const filteredCameras = useMemo(
@@ -203,6 +341,7 @@ export function useCameraManager() {
         setFeatureFilter,
         setSearchText,
         setStatusFilter,
+        socketStatus,
         stats,
         statusFilter,
         updateCameraForm,

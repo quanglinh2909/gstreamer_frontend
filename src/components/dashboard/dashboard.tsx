@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import {
     AlertTriangle,
     Car,
+    Clock,
     Cpu,
     Gauge,
     HardDrive,
@@ -19,6 +20,8 @@ import { DateRangeControl } from "./date-range-control";
 import {
     cn,
     formatBytes,
+    formatDateTime,
+    formatDuration,
     formatPercent,
     formatTemp,
     mergeByTs,
@@ -144,7 +147,10 @@ export function Dashboard({ manager }: { manager: DashboardManager }) {
             <div className="mx-auto flex min-h-full max-w-[1600px] flex-col gap-5 px-6 py-5">
                 <header className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
                     <div>
-
+                        <div className="flex items-center gap-3">
+                            <p className="text-sm font-semibold text-[#4369ee]">Monitoring</p>
+                            <SocketStatusBadge status={manager.socketStatus} />
+                        </div>
                         <h1 className="mt-1 text-2xl font-semibold text-slate-950">
                             Tổng quan hệ thống
                         </h1>
@@ -218,7 +224,7 @@ export function Dashboard({ manager }: { manager: DashboardManager }) {
                         {/* Thông số hiện tại */}
                         <section className="flex flex-col gap-3">
                             <h2 className="text-sm font-semibold text-slate-700">Thông số hiện tại</h2>
-                            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 2xl:grid-cols-7">
+                            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 2xl:grid-cols-8">
                                 <MetricCard
                                     label="CPU"
                                     value={formatPercent(current?.cpu_usage?.usage_percent)}
@@ -297,6 +303,17 @@ export function Dashboard({ manager }: { manager: DashboardManager }) {
                                     icon={Thermometer}
                                     tone="bg-rose-50 text-rose-700"
                                 />
+                                <MetricCard
+                                    label="Thời gian hoạt động"
+                                    value={formatDuration(current?.uptime?.uptime_seconds)}
+                                    subtitle={
+                                        current?.uptime
+                                            ? `Khởi động ${formatDateTime(current.uptime.boot_time)}`
+                                            : undefined
+                                    }
+                                    icon={Clock}
+                                    tone="bg-slate-100 text-slate-700"
+                                />
                             </div>
                         </section>
 
@@ -317,7 +334,7 @@ export function Dashboard({ manager }: { manager: DashboardManager }) {
                                 series={[{ key: "usage_percent", name: "CPU", color: "#4369ee" }]}
                             />
                             <MetricChart
-                                title="Bộ nhớ sử dụng"
+                                title="RAM"
                                 subtitle="percent theo thời gian"
                                 data={memData}
                                 unit="%"

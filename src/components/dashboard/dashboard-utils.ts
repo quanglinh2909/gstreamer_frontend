@@ -37,6 +37,28 @@ export function formatTemp(value: number | undefined): string {
     return `${value.toFixed(1)}°C`;
 }
 
+// A duration in seconds -> compact "Xd Yh Zm" (omits leading zero units).
+export function formatDuration(seconds: number | undefined): string {
+    if (seconds === undefined || !Number.isFinite(seconds) || seconds < 0) {
+        return "—";
+    }
+
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+
+    const parts: string[] = [];
+    if (days) {
+        parts.push(`${days}d`);
+    }
+    if (hours || days) {
+        parts.push(`${hours}h`);
+    }
+    parts.push(`${minutes}m`);
+
+    return parts.join(" ");
+}
+
 // Epoch seconds -> "HH:mm:ss" for chart axis ticks.
 export function formatClock(ts: number): string {
     return new Date(ts * 1000).toLocaleTimeString([], {

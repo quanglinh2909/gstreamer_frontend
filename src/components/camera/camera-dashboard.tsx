@@ -11,7 +11,7 @@ import {
     Video,
     WifiOff,
 } from "lucide-react";
-import type { CameraManager } from "@/hooks/use-camera-manager";
+import type { CameraManager, CameraSocketStatus } from "@/hooks/use-camera-manager";
 import { CameraCard } from "./camera-card";
 import { featureFilters, statusFilters } from "./camera-constants";
 import { CameraFormModal } from "./camera-form-modal";
@@ -19,13 +19,39 @@ import { CameraStatCard } from "./camera-stat-card";
 import { cn } from "./camera-utils";
 import { DeleteCameraModal } from "./delete-camera-modal";
 
+const SOCKET_META: Record<CameraSocketStatus, { label: string; dot: string; text: string }> = {
+    idle: { label: "Offline", dot: "bg-slate-400", text: "text-slate-500" },
+    connecting: { label: "Đang kết nối", dot: "bg-amber-400 animate-pulse", text: "text-amber-600" },
+    connected: { label: "Live", dot: "bg-emerald-500 animate-pulse", text: "text-emerald-600" },
+    reconnecting: { label: "Kết nối lại", dot: "bg-amber-400 animate-pulse", text: "text-amber-600" },
+    error: { label: "Mất kết nối", dot: "bg-rose-500", text: "text-rose-600" },
+};
+
+function CameraSocketBadge({ status }: { status: CameraSocketStatus }) {
+    const meta = SOCKET_META[status];
+    return (
+        <span
+            className={cn(
+                "inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold",
+                meta.text,
+            )}
+        >
+            <span className={cn("h-2 w-2 rounded-full", meta.dot)} aria-hidden="true" />
+            {meta.label}
+        </span>
+    );
+}
+
 export function CameraDashboard({ manager }: { manager: CameraManager }) {
     return (
         <main className="h-full overflow-y-auto bg-slate-50">
             <div className="mx-auto flex min-h-full max-w-[1600px] flex-col gap-5 px-6 py-5">
                 <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div>
-                        <p className="text-sm font-semibold text-[#4369ee]">Monitoring</p>
+                        <div className="flex items-center gap-3">
+                            <p className="text-sm font-semibold text-[#4369ee]">Monitoring</p>
+                            <CameraSocketBadge status={manager.socketStatus} />
+                        </div>
                         <h1 className="mt-1 text-2xl font-semibold text-slate-950">Cameras</h1>
                         <p className="mt-1 text-sm text-slate-500">
                             {manager.lastUpdated

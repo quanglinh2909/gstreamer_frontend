@@ -16,6 +16,15 @@ export interface ICameraCreate {
 
 }
 
+// Pushed over ws://<WEBSOCKET_ORIGIN_C>/camera-state whenever a camera's
+// state actually changes (see CameraStateSocket.hpp:96-105).
+export interface CameraStateMessage {
+    id: string
+    state: string
+    lastError: string
+    lastChangedAt: string
+}
+
 export interface ICameraResponse {
     id: string
     name: string

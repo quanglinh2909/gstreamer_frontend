@@ -13,6 +13,7 @@ import type {
     SystemMetricsResponse,
     SystemMetricsSnapshot,
     SystemMetricsSocketMessage,
+    UptimeSample,
 } from "@/interface/system-metrics";
 
 export type SocketStatus =
@@ -106,6 +107,7 @@ function messageToSnapshot(message: SystemMetricsSocketMessage): SystemMetricsSn
     const npu: AcceleratorSample | null = message.npu ? { ...base, ...message.npu } : null;
     const rga: AcceleratorSample | null = message.rga ? { ...base, ...message.rga } : null;
     const loadAvg: LoadAvgSample = { ...base, ...message.load_avg };
+    const uptime: UptimeSample | null = message.uptime ? { ...message.uptime } : null;
 
     return {
         cpu_usage: { ...base, ...message.cpu_usage },
@@ -115,6 +117,7 @@ function messageToSnapshot(message: SystemMetricsSocketMessage): SystemMetricsSn
         load_avg: loadAvg,
         npu,
         rga,
+        uptime,
     };
 }
 

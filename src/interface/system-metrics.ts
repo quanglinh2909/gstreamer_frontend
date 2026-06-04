@@ -46,6 +46,13 @@ export interface AcceleratorSample extends MetricSampleBase {
     core2: number;
 }
 
+// Current-only value (no history series). uptime_seconds: how long the box has
+// been up; boot_time: Epoch seconds of the last boot.
+export interface UptimeSample {
+    uptime_seconds: number;
+    boot_time: number;
+}
+
 export interface SystemMetricsSnapshot {
     cpu_usage: CpuUsageSample | null;
     cpu_temperature: CpuTemperatureSample | null;
@@ -54,6 +61,7 @@ export interface SystemMetricsSnapshot {
     load_avg: LoadAvgSample | null;
     npu: AcceleratorSample | null;
     rga: AcceleratorSample | null;
+    uptime: UptimeSample | null;
 }
 
 export interface SystemMetricsHistory {
@@ -101,4 +109,5 @@ export interface SystemMetricsSocketMessage {
     load_avg: Omit<LoadAvgSample, "id" | "ts">;
     npu: Omit<AcceleratorSample, "id" | "ts">;
     rga: Omit<AcceleratorSample, "id" | "ts">;
+    uptime: UptimeSample;
 }
