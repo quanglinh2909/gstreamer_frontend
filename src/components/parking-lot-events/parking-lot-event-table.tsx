@@ -1,9 +1,64 @@
-import { Clock, ScanLine, SmilePlus, SquareParking, UserRound } from "lucide-react";
+import { useState } from "react";
+import Image from "next/image";
+import { Clock, ImageOff, ScanLine, SmilePlus, SquareParking, UserRound } from "lucide-react";
 import type { ParkingLotEvent } from "@/interface/parking-lot-event";
-import { formatParkingLotEventTimestamp } from "@/lib/parking-lot-event-view-model";
+import {
+    formatParkingLotEventTimestamp,
+    getParkingLotEventImageUrl,
+} from "@/lib/parking-lot-event-view-model";
+import {
+    ParkingLotEventImageModal,
+    type ParkingLotEventPreview,
+} from "./parking-lot-event-image-modal";
+
+function EventThumbnail({
+    label,
+    path,
+    onOpen,
+}: {
+    label: string;
+    path: string;
+    onOpen: () => void;
+}) {
+    const [hasError, setHasError] = useState(false);
+    const imageUrl = getParkingLotEventImageUrl(path);
+
+    if (!imageUrl || hasError) {
+        return (
+            <div
+                className="flex h-14 w-14 flex-col items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-slate-400"
+                aria-label={`${label}: không có ảnh`}
+            >
+                <ImageOff size={16} aria-hidden="true" />
+            </div>
+        );
+    }
+
+    return (
+        <button
+            type="button"
+            onClick={onOpen}
+            aria-label={`Xem ảnh ${label}`}
+            className="group relative h-14 w-14 overflow-hidden rounded-lg border border-slate-200 bg-slate-900 transition-colors hover:border-[#4369ee] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4369ee]"
+        >
+            <Image
+                src={imageUrl}
+                alt={label}
+                fill
+                unoptimized
+                sizes="56px"
+                onError={() => setHasError(true)}
+                className="object-cover transition-transform duration-300 group-hover:scale-[1.06]"
+            />
+        </button>
+    );
+}
 
 export function ParkingLotEventTable({ events }: { events: ParkingLotEvent[] }) {
+    const [preview, setPreview] = useState<ParkingLotEventPreview | null>(null);
+
     return (
+        <>
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="overflow-x-auto">
                 <table className="min-w-full border-collapse">
@@ -14,6 +69,7 @@ export function ParkingLotEventTable({ events }: { events: ParkingLotEvent[] }) 
                             <th className="px-5 py-4">Bãi xe</th>
                             <th className="px-5 py-4">Identity</th>
                             <th className="px-5 py-4">Biển số</th>
+                            <th className="px-5 py-4">Hình ảnh</th>
                             <th className="px-5 py-4">Camera</th>
                         </tr>
                     </thead>
@@ -59,6 +115,32 @@ export function ParkingLotEventTable({ events }: { events: ParkingLotEvent[] }) 
                                     )}
                                 </td>
                                 <td className="px-5 py-4">
+                                    <div className="flex items-center gap-2">
+                                        <EventThumbnail
+                                            label="Khuôn mặt"
+                                            path={event.face_image_full}
+                                            onOpen={() =>
+                                                setPreview({
+                                                    title: event.name || `ID #${event.identity_id}`,
+                                                    label: "Ảnh khuôn mặt",
+                                                    path: event.face_image_full,
+                                                })
+                                            }
+                                        />
+                                        <EventThumbnail
+                                            label="Biển số"
+                                            path={event.plate_image_full}
+                                            onOpen={() =>
+                                                setPreview({
+                                                    title: event.plate_number || `ID #${event.id}`,
+                                                    label: "Ảnh biển số",
+                                                    path: event.plate_image_full,
+                                                })
+                                            }
+                                        />
+                                    </div>
+                                </td>
+                                <td className="px-5 py-4">
                                     <div className="flex flex-col gap-1 text-xs text-slate-500">
                                         <span className="inline-flex items-center gap-1.5">
                                             <SmilePlus size={13} className="text-slate-400" aria-hidden="true" />
@@ -76,5 +158,8 @@ export function ParkingLotEventTable({ events }: { events: ParkingLotEvent[] }) 
                 </table>
             </div>
         </div>
+
+        <ParkingLotEventImageModal preview={preview} onClose={() => setPreview(null)} />
+        </>
     );
 }

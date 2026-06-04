@@ -7,6 +7,8 @@ export interface ParkingLotEvent {
     plate_number: string;
     face_camera_id: string;
     plate_camera_id: string;
+    face_image_full: string;
+    plate_image_full: string;
     timestamp: number;
 }
 

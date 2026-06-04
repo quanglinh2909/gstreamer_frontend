@@ -57,6 +57,20 @@ export function getVisibleParkingLotEventPages(currentPage, totalPages) {
     });
 }
 
+export function getParkingLotEventImageUrl(path) {
+    const imagePath = asText(path);
+
+    if (!imagePath || imagePath.startsWith("/api/backend/")) {
+        return imagePath;
+    }
+
+    if (/^(https?:|blob:|data:)/.test(imagePath)) {
+        return imagePath;
+    }
+
+    return `/api/backend/${imagePath.replace(/^\/+/, "")}`;
+}
+
 // Exposed for symmetry with other view-models; trims free-text filter values.
 export function normalizeParkingLotEventFilter(value) {
     return asText(value);
