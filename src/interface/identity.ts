@@ -1,6 +1,7 @@
 export interface Identity {
     id: number;
     name: string;
+    mac_bluetooth: string;
     image_full: string;
     image_crop: string;
 }

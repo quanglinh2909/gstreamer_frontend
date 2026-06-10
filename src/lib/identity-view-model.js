@@ -28,6 +28,7 @@ export function buildIdentityFormData(form) {
     const payload = new FormData();
 
     payload.append("name", asText(form?.name));
+    payload.append("mac_bluetooth", asText(form?.macBluetooth));
 
     if (form?.image) {
         payload.append("image", form.image);

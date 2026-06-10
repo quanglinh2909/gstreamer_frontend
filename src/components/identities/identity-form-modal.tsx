@@ -13,6 +13,7 @@ export function IdentityFormModal({
     onClose,
     onSubmit,
     onNameChange,
+    onMacBluetoothChange,
     onImageChange,
 }: {
     mode: IdentityFormMode;
@@ -23,6 +24,7 @@ export function IdentityFormModal({
     onClose: () => void;
     onSubmit: (event: FormEvent<HTMLFormElement>) => void;
     onNameChange: (name: string) => void;
+    onMacBluetoothChange: (macBluetooth: string) => void;
     onImageChange: (image: File | null) => void;
 }) {
     useEffect(() => {
@@ -92,6 +94,19 @@ export function IdentityFormModal({
                                 value={form.name}
                                 onChange={(event) => onNameChange(event.target.value)}
                                 placeholder="Nhập tên người nhận diện"
+                                className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition-colors focus:border-[#4369ee]"
+                            />
+                        </label>
+
+                        <label className="block">
+                            <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                                MAC Bluetooth
+                            </span>
+                            <input
+                                type="text"
+                                value={form.macBluetooth}
+                                onChange={(event) => onMacBluetoothChange(event.target.value)}
+                                placeholder="VD: AA:BB:CC:DD:EE:FF"
                                 className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition-colors focus:border-[#4369ee]"
                             />
                         </label>

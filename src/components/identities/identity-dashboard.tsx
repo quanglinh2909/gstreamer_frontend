@@ -191,6 +191,7 @@ export function IdentityDashboard({ manager }: { manager: IdentityManager }) {
                     onClose={manager.closeIdentityForm}
                     onSubmit={manager.handleFormSubmit}
                     onNameChange={manager.setFormName}
+                    onMacBluetoothChange={manager.setFormMacBluetooth}
                     onImageChange={manager.setFormImage}
                 />
             ) : null}

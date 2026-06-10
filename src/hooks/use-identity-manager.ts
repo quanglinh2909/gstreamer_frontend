@@ -12,6 +12,7 @@ export type IdentityFormMode = "create" | "edit";
 
 export type IdentityFormState = {
     name: string;
+    macBluetooth: string;
     image: File | null;
     previewUrl: string;
 };
@@ -65,6 +66,7 @@ function asIdentityPage(data: unknown, requestedPage: number): IdentityPage {
 function createIdentityForm(identity?: Identity | null): IdentityFormState {
     return {
         name: identity?.name ?? "",
+        macBluetooth: identity?.mac_bluetooth ?? "",
         image: null,
         previewUrl: "",
     };
@@ -379,6 +381,10 @@ export function useIdentityManager() {
         setForm((current) => ({ ...current, name }));
     };
 
+    const setFormMacBluetooth = (macBluetooth: string) => {
+        setForm((current) => ({ ...current, macBluetooth }));
+    };
+
     const setFormImage = (image: File | null) => {
         clearFormPreview();
         const previewUrl = image ? URL.createObjectURL(image) : "";
@@ -504,6 +510,7 @@ export function useIdentityManager() {
         setCurrentPage,
         setEditingPlateNumber,
         setFormImage,
+        setFormMacBluetooth,
         setFormName,
         setNewPlateNumber,
         setSearchText,
