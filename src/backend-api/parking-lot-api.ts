@@ -25,4 +25,11 @@ export const parkingLotApi = {
     delete(id: number) {
         return backendClient.delete(`parking-lots/${id}`);
     },
+
+    controlBarrier(ioPin: number) {
+        return backendClient.post("barrier/open", { io_pin: ioPin });
+    },
 };
+
+export const BARRIER_OPEN_PIN = 5;
+export const BARRIER_CLOSE_PIN = 19;

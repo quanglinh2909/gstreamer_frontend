@@ -1,4 +1,14 @@
-import { AlertTriangle, Plus, RefreshCw, Search, SquareParking, X } from "lucide-react";
+import {
+    AlertTriangle,
+    ArrowDownToLine,
+    ArrowUpFromLine,
+    CheckCircle2,
+    Plus,
+    RefreshCw,
+    Search,
+    SquareParking,
+    X,
+} from "lucide-react";
 import type { ParkingLotManager } from "@/hooks/use-parking-lot-manager";
 import { DeleteParkingLotModal } from "./delete-parking-lot-modal";
 import { ParkingLotFormModal } from "./parking-lot-form-modal";
@@ -45,6 +55,32 @@ export function ParkingLotDashboard({ manager }: { manager: ParkingLotManager })
                         </div>
                         <button
                             type="button"
+                            onClick={() => void manager.controlBarrier("open")}
+                            disabled={manager.barrierAction !== null}
+                            className="inline-flex h-11 items-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-60"
+                        >
+                            <ArrowUpFromLine
+                                size={16}
+                                className={cn(manager.barrierAction === "open" && "animate-pulse")}
+                                aria-hidden="true"
+                            />
+                            Mở barrier
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => void manager.controlBarrier("close")}
+                            disabled={manager.barrierAction !== null}
+                            className="inline-flex h-11 items-center gap-2 rounded-lg bg-rose-600 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-rose-700 disabled:opacity-60"
+                        >
+                            <ArrowDownToLine
+                                size={16}
+                                className={cn(manager.barrierAction === "close" && "animate-pulse")}
+                                aria-hidden="true"
+                            />
+                            Đóng barrier
+                        </button>
+                        <button
+                            type="button"
                             onClick={manager.openCreateParkingLot}
                             className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#4369ee] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#3156d4]"
                         >
@@ -66,6 +102,24 @@ export function ParkingLotDashboard({ manager }: { manager: ParkingLotManager })
                         </button>
                     </div>
                 </header>
+
+                {manager.barrierMessage ? (
+                    <div
+                        className={cn(
+                            "flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-medium",
+                            manager.barrierError
+                                ? "border-rose-200 bg-rose-50 text-rose-700"
+                                : "border-emerald-200 bg-emerald-50 text-emerald-700",
+                        )}
+                    >
+                        {manager.barrierError ? (
+                            <AlertTriangle size={16} aria-hidden="true" />
+                        ) : (
+                            <CheckCircle2 size={16} aria-hidden="true" />
+                        )}
+                        {manager.barrierMessage}
+                    </div>
+                ) : null}
 
                 <form
                     onSubmit={manager.handleSearchSubmit}

@@ -1,5 +1,9 @@
 import { type FormEvent, useEffect, useState } from "react";
-import { parkingLotApi } from "@/backend-api/parking-lot-api";
+import {
+    BARRIER_CLOSE_PIN,
+    BARRIER_OPEN_PIN,
+    parkingLotApi,
+} from "@/backend-api/parking-lot-api";
 import { cameraApi } from "@/backend-api/camera-api";
 import type { ParkingLot, ParkingLotPage } from "@/interface/parking-lot";
 import type { ICameraResponse } from "@/interface/camera";
@@ -94,6 +98,9 @@ export function useParkingLotManager() {
     const [deleteTarget, setDeleteTarget] = useState<ParkingLot | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteErrorMessage, setDeleteErrorMessage] = useState("");
+    const [barrierAction, setBarrierAction] = useState<"open" | "close" | null>(null);
+    const [barrierMessage, setBarrierMessage] = useState("");
+    const [barrierError, setBarrierError] = useState(false);
 
     useEffect(() => {
         let isCancelled = false;
@@ -238,6 +245,34 @@ export function useParkingLotManager() {
         }
     };
 
+    const controlBarrier = async (action: "open" | "close") => {
+        if (barrierAction) {
+            return;
+        }
+
+        setBarrierAction(action);
+        setBarrierMessage("");
+        setBarrierError(false);
+
+        try {
+            await parkingLotApi.controlBarrier(
+                action === "open" ? BARRIER_OPEN_PIN : BARRIER_CLOSE_PIN,
+            );
+            setBarrierError(false);
+            setBarrierMessage(action === "open" ? "Đã mở barrier." : "Đã đóng barrier.");
+        } catch (error) {
+            setBarrierError(true);
+            setBarrierMessage(
+                getErrorMessage(
+                    error,
+                    action === "open" ? "Không thể mở barrier." : "Không thể đóng barrier.",
+                ),
+            );
+        } finally {
+            setBarrierAction(null);
+        }
+    };
+
     const openDeleteParkingLot = (parkingLot: ParkingLot) => {
         setDeleteTarget(parkingLot);
         setDeleteErrorMessage("");
@@ -275,8 +310,12 @@ export function useParkingLotManager() {
     };
 
     return {
+        barrierAction,
+        barrierError,
+        barrierMessage,
         cameras,
         clearSearch,
+        controlBarrier,
         closeDeleteParkingLot,
         closeForm,
         confirmDeleteParkingLot,
