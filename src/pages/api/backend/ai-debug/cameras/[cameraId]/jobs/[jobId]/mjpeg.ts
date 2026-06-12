@@ -45,9 +45,30 @@ export default async function handler(
   }
 
   const abortController = new AbortController();
-  const abortUpstream = () => abortController.abort();
 
-  res.on("close", abortUpstream);
+  // Tear the upstream MJPEG stream down the moment the browser goes away.
+  // This is the whole point of the proxy getting this right: the Python
+  // backend keeps a frame generator (and re-arms the C++ engine's per-frame
+  // JPEG encode) alive for as long as ITS client — this proxy — stays
+  // connected. If we leak the upstream fetch, the backend never sees the
+  // disconnect and keeps burning CPU forever, and every open/close of the
+  // debug view stacks another leaked stream.
+  //
+  // In the Pages Router dev server, `res` "close" alone has proven
+  // unreliable for long-lived streams, so we bind the client-disconnect
+  // signal on BOTH `req` and `res`, flip a flag the read loop checks, and —
+  // critically — abort the fetch unconditionally in `finally` so the upstream
+  // socket is destroyed no matter how the loop exits.
+  let clientGone = false;
+  const onClientGone = () => {
+    clientGone = true;
+    abortController.abort();
+  };
+  req.on("close", onClientGone);
+  req.on("aborted", onClientGone);
+  res.on("close", onClientGone);
+
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
 
   try {
     const upstream = await fetch(targetUrl, {
@@ -67,16 +88,28 @@ export default async function handler(
 
     res.flushHeaders();
 
-    const reader = upstream.body.getReader();
+    reader = upstream.body.getReader();
 
-    while (!res.destroyed) {
+    while (!clientGone && !res.destroyed && res.writable) {
       const { done, value } = await reader.read();
+      if (done) break;
+      if (clientGone || res.destroyed || !res.writable) break;
 
-      if (done) {
-        break;
+      // Respect backpressure: if the client (or the dev server's buffer)
+      // can't keep up, wait for drain rather than piling frames into memory.
+      // A disconnect during the wait resolves it immediately so we don't hang.
+      const ok = res.write(Buffer.from(value));
+      if (!ok) {
+        await new Promise<void>((resolve) => {
+          const done2 = () => {
+            res.off("drain", done2);
+            res.off("close", done2);
+            resolve();
+          };
+          res.on("drain", done2);
+          res.on("close", done2);
+        });
       }
-
-      res.write(Buffer.from(value));
     }
   } catch (error) {
     if (!abortController.signal.aborted) {
@@ -89,7 +122,21 @@ export default async function handler(
       }
     }
   } finally {
-    res.off("close", abortUpstream);
+    req.off("close", onClientGone);
+    req.off("aborted", onClientGone);
+    res.off("close", onClientGone);
+
+    // Force the upstream connection closed regardless of why we got here.
+    // `reader.cancel()` releases the web stream; `abort()` destroys the
+    // undici socket so it cannot linger in the connection pool.
+    if (reader) {
+      try {
+        await reader.cancel();
+      } catch {
+        // already errored/aborted — nothing to release
+      }
+    }
+    abortController.abort();
 
     if (!res.writableEnded && !res.destroyed) {
       res.end();

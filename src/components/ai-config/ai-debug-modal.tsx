@@ -1,6 +1,15 @@
 import { useEffect } from "react";
 import { MonitorPlay, X } from "lucide-react";
 
+// A 1x1 transparent GIF. Pointing the <img> at this on close forces the
+// browser to drop the live MJPEG connection. Just removing the element from
+// the DOM does NOT abort a multipart/x-mixed-replace stream — the browser
+// keeps the socket open until a full page reload — which left the Python
+// backend decoding/encoding overlay frames (and re-arming the C++ encoder)
+// for a viewer that was already gone. Swapping src to a data URI aborts it.
+const BLANK_PIXEL =
+    "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
+
 export function AiDebugModal({
     featureLabel,
     isOpen,
@@ -28,7 +37,11 @@ export function AiDebugModal({
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, [isOpen, onClose]);
 
-    if (!isOpen || !streamUrl) {
+    // Keep the element mounted whenever a stream is configured and only TOGGLE
+    // the src by `isOpen`. The <img> must stay in the DOM through the close so
+    // the src→blank swap can actually abort the connection; unmounting it
+    // first (the old `return null`) skipped that and leaked the stream.
+    if (!streamUrl) {
         return null;
     }
 
@@ -38,6 +51,7 @@ export function AiDebugModal({
             aria-modal="true"
             aria-label={`Video debug ${featureLabel}`}
             className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-5"
+            style={{ display: isOpen ? "flex" : "none" }}
             onMouseDown={(event) => {
                 if (event.target === event.currentTarget) {
                     onClose();
@@ -65,9 +79,10 @@ export function AiDebugModal({
 
                 <div className="flex min-h-[320px] items-center justify-center bg-black p-3">
                     {/* MJPEG must stay a direct image request so frames can stream continuously. */}
+                    {/* When closed, src points at a blank pixel so the browser drops the stream. */}
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                        src={streamUrl}
+                        src={isOpen ? streamUrl : BLANK_PIXEL}
                         alt={`Luồng debug ${featureLabel}`}
                         className="max-h-[76vh] w-full rounded-lg object-contain"
                     />
