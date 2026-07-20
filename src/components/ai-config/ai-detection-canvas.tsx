@@ -27,8 +27,8 @@ const shapeStyles: Record<AiShapeKind, { fill: string; stroke: string }> = {
         fill: "rgba(244, 63, 94, 0.22)",
         stroke: "#fb7185",
     },
-    tripwire: {
-        fill: "transparent",
+    faceMaskZone: {
+        fill: "rgba(245, 158, 11, 0.2)",
         stroke: "#f59e0b",
     },
 };
@@ -125,59 +125,6 @@ function ShapeOverlay({
     shape: AiDetectionShape;
 }) {
     const style = shapeStyles[shape.kind];
-
-    if (shape.kind === "tripwire") {
-        const [start, end] = shape.points;
-
-        if (!start || !end) {
-            return null;
-        }
-
-        return (
-            <g>
-                <line
-                    x1={start.x * 100}
-                    y1={start.y * 100}
-                    x2={end.x * 100}
-                    y2={end.y * 100}
-                    stroke={style.stroke}
-                    strokeWidth="1.7"
-                    strokeLinecap="round"
-                />
-                <line
-                    x1={start.x * 100}
-                    y1={start.y * 100}
-                    x2={end.x * 100}
-                    y2={end.y * 100}
-                    stroke="transparent"
-                    strokeWidth="8"
-                    strokeLinecap="round"
-                    className="cursor-grab active:cursor-grabbing"
-                    pointerEvents="stroke"
-                    onContextMenu={(event) => onShapeContextMenu(shape, event)}
-                    onPointerDown={(event) => onShapeDragStart(shape.id, event)}
-                />
-                {[start, end].map((point, index) => (
-                    <circle
-                        key={`${shape.id}-${index}`}
-                        cx={point.x * 100}
-                        cy={point.y * 100}
-                        r="1.7"
-                        fill="#ffffff"
-                        stroke={style.stroke}
-                        strokeWidth="0.7"
-                        className="cursor-grab active:cursor-grabbing"
-                        onContextMenu={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            onShapePointRemove(shape.id, index);
-                        }}
-                        onPointerDown={(event) => onPointDragStart(shape.id, index, event)}
-                    />
-                ))}
-            </g>
-        );
-    }
 
     return (
         <g>
@@ -372,7 +319,7 @@ export function AiDetectionCanvas({
             return;
         }
 
-        if (event.button !== 0 || shape.kind === "tripwire") {
+        if (event.button !== 0) {
             return;
         }
 
@@ -394,7 +341,7 @@ export function AiDetectionCanvas({
     };
 
     const handleDraftEdgeInsertStart = (pointIndex: number, event: React.PointerEvent<SVGElement>) => {
-        if (!canDraw || !surfaceRef.current || activeFeatureItem.shapeKind === "tripwire") {
+        if (!canDraw || !surfaceRef.current) {
             return;
         }
 
@@ -578,18 +525,7 @@ export function AiDetectionCanvas({
 
                         {draftPoints.length > 0 ? (
                             <g>
-                                {activeFeatureItem.shapeKind === "tripwire" && draftPoints.length === 2 ? (
-                                    <line
-                                        x1={draftPoints[0].x * 100}
-                                        y1={draftPoints[0].y * 100}
-                                        x2={draftPoints[1].x * 100}
-                                        y2={draftPoints[1].y * 100}
-                                        stroke={draftStyle.stroke}
-                                        strokeWidth="1.5"
-                                        strokeDasharray="3 2"
-                                        strokeLinecap="round"
-                                    />
-                                ) : draftPoints.length >= 3 ? (
+                                {draftPoints.length >= 3 ? (
                                     <polygon
                                         points={getPolygonPoints(draftPoints)}
                                         fill={draftStyle.fill}
@@ -607,8 +543,7 @@ export function AiDetectionCanvas({
                                     />
                                 )}
 
-                                {activeFeatureItem.shapeKind !== "tripwire"
-                                    ? getSegments(draftPoints, draftPoints.length >= 3).map((segment) => (
+                                {getSegments(draftPoints, draftPoints.length >= 3).map((segment) => (
                                         <line
                                             key={`draft-edge-${segment.index}`}
                                             x1={segment.start.x * 100}
@@ -624,8 +559,7 @@ export function AiDetectionCanvas({
                                                 handleDraftEdgeInsertStart(segment.index, event)
                                             }
                                         />
-                                    ))
-                                    : null}
+                                    ))}
 
                                 {draftPoints.map((point, index) => (
                                     <circle

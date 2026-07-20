@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { systemMetricsApi } from "@/backend-api/system-metrics-api";
+import { resolveWebSocketOrigin } from "@/lib/websocket-origin";
 import type {
     AcceleratorSample,
     AiEnabledCount,
@@ -236,7 +237,7 @@ export function useDashboardManager(websocketOrigin = ""): DashboardManager {
             return;
         }
 
-        const baseUrl = websocketOrigin.trim().replace(/\/+$/, "");
+        const baseUrl = resolveWebSocketOrigin(websocketOrigin);
         const url = `${baseUrl}/system-metrics`;
         let socket: WebSocket | null = null;
         let reconnectTimer: ReturnType<typeof setTimeout> | null = null;

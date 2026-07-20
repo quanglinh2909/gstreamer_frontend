@@ -11,6 +11,9 @@ export function AiFeatureRow({
     onMaxFpsChange,
     onOverlapThresholdChange,
     onTrackerChange,
+    onCountConfirmChange,
+    onReAlertSecondsChange,
+    onPreTimeChange,
     onConfidenceChange,
     onToggle,
 }: {
@@ -26,11 +29,19 @@ export function AiFeatureRow({
     onMaxFpsChange: (featureId: AiFeatureId, maxFps: number) => void;
     onOverlapThresholdChange: (featureId: AiFeatureId, overlapThreshold: number) => void;
     onTrackerChange: (featureId: AiFeatureId, tracker: AiTracker) => void;
+    onCountConfirmChange: (featureId: AiFeatureId, countConfirm: number) => void;
+    onReAlertSecondsChange: (featureId: AiFeatureId, reAlertSeconds: number) => void;
+    onPreTimeChange: (featureId: AiFeatureId, preTime: number) => void;
     onToggle: (featureId: AiFeatureId) => void;
 }) {
-    const isTrackedFeature = id === "face" || id === "licensePlate" || id === "restrictedZone";
+    const isTrackedFeature = id === "face" || id === "licensePlate" || id === "restrictedZone" || id === "faceMask";
+    const isFaceMask = id === "faceMask";
+    const isLicensePlate = id === "licensePlate";
     const overlapThreshold = feature.overlapThreshold ?? 30;
     const tracker = feature.tracker ?? "bytetrack";
+    const countConfirm = feature.countConfirm ?? 3;
+    const reAlertSeconds = feature.reAlertSeconds ?? 0;
+    const preTime = feature.preTime ?? 10;
 
     return (
         <section className="rounded-lg border border-slate-200 bg-white p-3">
@@ -132,6 +143,51 @@ export function AiFeatureRow({
                             </div>
                         </fieldset>
                     </>
+                ) : null}
+                {isFaceMask ? (
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="mb-2 block text-xs font-semibold text-slate-500">
+                                Số lần xác nhận
+                            </label>
+                            <input
+                                type="number"
+                                min={1}
+                                max={30}
+                                value={countConfirm}
+                                onChange={(event) => onCountConfirmChange(id, Number(event.target.value))}
+                                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-[#4369ee] focus:outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="mb-2 block text-xs font-semibold text-slate-500">
+                                Báo lại sau (giây)
+                            </label>
+                            <input
+                                type="number"
+                                min={0}
+                                max={3600}
+                                value={reAlertSeconds}
+                                onChange={(event) => onReAlertSecondsChange(id, Number(event.target.value))}
+                                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-[#4369ee] focus:outline-none"
+                            />
+                        </div>
+                    </div>
+                ) : null}
+                {isLicensePlate ? (
+                    <div>
+                        <label className="mb-2 block text-xs font-semibold text-slate-500">
+                            Chờ tối thiểu giữa 2 lần mở (giây)
+                        </label>
+                        <input
+                            type="number"
+                            min={0}
+                            max={3600}
+                            value={preTime}
+                            onChange={(event) => onPreTimeChange(id, Number(event.target.value))}
+                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-[#4369ee] focus:outline-none"
+                        />
+                    </div>
                 ) : null}
                 <div>
                     <div className="mb-2 flex items-center justify-between text-xs font-semibold text-slate-500">

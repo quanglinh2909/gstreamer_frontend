@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { cameraApi } from "@/backend-api/camera-api";
+import { faceMaskApi } from "@/backend-api/face-mask-api";
 import { faceRecognitionApi } from "@/backend-api/face-recognition-api";
 import { plateRecognitionApi } from "@/backend-api/plate-recognition-api";
 import { restrictedAreaApi } from "@/backend-api/restricted-area-api";
@@ -18,6 +19,7 @@ import {
     addAiDetectionShape,
     buildRecognitionPayload,
     buildRestrictedAreaPayload,
+    buildFaceMaskPayload,
     buildAiDetectionShape,
     getAiDebugJobId,
     getAiDebugStreamUrl,
@@ -336,30 +338,26 @@ export function useAiConfigManager() {
         );
     };
 
+    const setFeatureCountConfirm = (featureId: AiFeatureId, countConfirm: number) => {
+        updateSelectedConfig((config) =>
+            updateAiFeature(config, featureId, { countConfirm }) as AiCameraConfig,
+        );
+    };
+
+    const setFeatureReAlertSeconds = (featureId: AiFeatureId, reAlertSeconds: number) => {
+        updateSelectedConfig((config) =>
+            updateAiFeature(config, featureId, { reAlertSeconds }) as AiCameraConfig,
+        );
+    };
+
+    const setFeaturePreTime = (featureId: AiFeatureId, preTime: number) => {
+        updateSelectedConfig((config) =>
+            updateAiFeature(config, featureId, { preTime }) as AiCameraConfig,
+        );
+    };
+
     const addCanvasPoint = (point: AiPoint) => {
         if (!selectedCameraId) {
-            return;
-        }
-
-        const activeFeatureItem = getAiFeatureItem(activeFeatureId);
-
-        if (activeFeatureItem.shapeKind === "tripwire") {
-            const nextPoints = [...draftPoints, point];
-
-            if (nextPoints.length >= 2) {
-                const shape = buildAiDetectionShape({
-                    cameraId: selectedCameraId,
-                    kind: "tripwire",
-                    label: `${activeFeatureItem.shapeLabel} ${(selectedConfig?.shapes.filter((item) => item.kind === "tripwire").length ?? 0) + 1}`,
-                    points: nextPoints.slice(0, 2),
-                });
-
-                updateSelectedConfig((config) => addAiDetectionShape(config, shape) as AiCameraConfig);
-                setDraftPoints([]);
-                return;
-            }
-
-            setDraftPoints(nextPoints);
             return;
         }
 
@@ -373,10 +371,6 @@ export function useAiConfigManager() {
             }
 
             const activeFeatureItem = getAiFeatureItem(activeFeatureId);
-
-            if (activeFeatureItem.shapeKind === "tripwire") {
-                return config;
-            }
 
             const shape = buildAiDetectionShape({
                 cameraId: selectedCameraId,
@@ -392,12 +386,6 @@ export function useAiConfigManager() {
 
     const addActiveZone = () => {
         if (!selectedCameraId || draftPoints.length < 3) {
-            return;
-        }
-
-        const activeFeatureItem = getAiFeatureItem(activeFeatureId);
-
-        if (activeFeatureItem.shapeKind === "tripwire") {
             return;
         }
 
@@ -461,9 +449,10 @@ export function useAiConfigManager() {
             if (
                 activeFeatureId !== "face" &&
                 activeFeatureId !== "licensePlate" &&
-                activeFeatureId !== "restrictedZone"
+                activeFeatureId !== "restrictedZone" &&
+                activeFeatureId !== "faceMask"
             ) {
-                setRecognitionErrorMessage("Chỉ hỗ trợ lưu Khuôn mặt, Biển số hoặc Vùng cấm.");
+                setRecognitionErrorMessage("Chỉ hỗ trợ lưu Khuôn mặt, Biển số, Vùng cấm hoặc Khẩu trang.");
                 return;
             }
 
@@ -489,6 +478,10 @@ export function useAiConfigManager() {
                     const payload = buildRestrictedAreaPayload(configForPayload, snapshotSize);
                     await restrictedAreaApi.restrictedArea(payload);
                     setRecognitionMessage("Đã lưu cấu hình vùng cấm.");
+                } else if (activeFeatureId === "faceMask") {
+                    const payload = buildFaceMaskPayload(configForPayload, snapshotSize);
+                    await faceMaskApi.faceMask(payload);
+                    setRecognitionMessage("Đã lưu cấu hình nhận diện khẩu trang.");
                 }
 
                 if (configForPayload !== selectedConfig) {
@@ -551,6 +544,9 @@ export function useAiConfigManager() {
         setFeatureMaxFps,
         setFeatureOverlapThreshold,
         setFeatureTracker,
+        setFeatureCountConfirm,
+        setFeatureReAlertSeconds,
+        setFeaturePreTime,
         snapshotErrorMessage,
         snapshotSize,
         snapshotUrl,

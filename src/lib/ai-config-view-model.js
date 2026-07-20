@@ -1,23 +1,26 @@
-export const AI_FEATURE_IDS = ["face", "licensePlate", "restrictedZone", "tripwire"];
+export const AI_FEATURE_IDS = ["face", "licensePlate", "restrictedZone", "faceMask"];
 
-export const AI_SHAPE_KINDS = ["faceZone", "licensePlateZone", "restrictedZone", "tripwire"];
+export const AI_SHAPE_KINDS = ["faceZone", "licensePlateZone", "restrictedZone", "faceMaskZone"];
 
 export const AI_FEATURE_SHAPE_KIND = {
     face: "faceZone",
     licensePlate: "licensePlateZone",
     restrictedZone: "restrictedZone",
-    tripwire: "tripwire",
+    faceMask: "faceMaskZone",
 };
 
 export const AI_SHAPE_FEATURE_ID = {
     faceZone: "face",
     licensePlateZone: "licensePlate",
     restrictedZone: "restrictedZone",
-    tripwire: "tripwire",
+    faceMaskZone: "faceMask",
 };
 
 const DEFAULT_CONFIDENCE = 70;
 const DEFAULT_OVERLAP_THRESHOLD = 30;
+const DEFAULT_COUNT_CONFIRM = 3;
+const DEFAULT_RE_ALERT_SECONDS = 0;
+const DEFAULT_PRE_TIME = 10;
 const DEFAULT_MAX_FPS = 10;
 const DEFAULT_RECOGNITION_MAX_FPS = 5;
 const DEFAULT_TRACKER = /** @type {const} */ ("bytetrack");
@@ -101,6 +104,7 @@ function createDefaultFeatures() {
             textRecognitionConfidence: DEFAULT_CONFIDENCE,
             overlapThreshold: DEFAULT_OVERLAP_THRESHOLD,
             tracker: DEFAULT_TRACKER,
+            preTime: DEFAULT_PRE_TIME,
         },
         restrictedZone: {
             enabled: false,
@@ -109,7 +113,15 @@ function createDefaultFeatures() {
             overlapThreshold: DEFAULT_OVERLAP_THRESHOLD,
             tracker: DEFAULT_TRACKER,
         },
-        tripwire: { enabled: false, detectionConfidence: DEFAULT_CONFIDENCE, maxFps: DEFAULT_MAX_FPS },
+        faceMask: {
+            enabled: false,
+            detectionConfidence: DEFAULT_CONFIDENCE,
+            maxFps: DEFAULT_RECOGNITION_MAX_FPS,
+            overlapThreshold: DEFAULT_OVERLAP_THRESHOLD,
+            tracker: DEFAULT_TRACKER,
+            countConfirm: DEFAULT_COUNT_CONFIRM,
+            reAlertSeconds: DEFAULT_RE_ALERT_SECONDS,
+        },
     };
 }
 
@@ -122,7 +134,7 @@ function getDetectionConfidence(feature) {
 }
 
 function normalizeFeature(feature, featureId) {
-    const isTrackedFeature = featureId === "face" || featureId === "licensePlate" || featureId === "restrictedZone";
+    const isTrackedFeature = featureId === "face" || featureId === "licensePlate" || featureId === "restrictedZone" || featureId === "faceMask";
     const defaultMaxFps = isTrackedFeature
         ? DEFAULT_RECOGNITION_MAX_FPS
         : DEFAULT_MAX_FPS;
@@ -146,6 +158,11 @@ function normalizeFeature(feature, featureId) {
             0,
             100,
         );
+        normalizedFeature.preTime = clampInteger(
+            feature?.preTime ?? DEFAULT_PRE_TIME,
+            0,
+            3600,
+        );
     }
 
     if (isTrackedFeature) {
@@ -155,6 +172,19 @@ function normalizeFeature(feature, featureId) {
             100,
         );
         normalizedFeature.tracker = normalizeTracker(feature?.tracker);
+    }
+
+    if (featureId === "faceMask") {
+        normalizedFeature.countConfirm = clampInteger(
+            feature?.countConfirm ?? DEFAULT_COUNT_CONFIRM,
+            1,
+            30,
+        );
+        normalizedFeature.reAlertSeconds = clampInteger(
+            feature?.reAlertSeconds ?? DEFAULT_RE_ALERT_SECONDS,
+            0,
+            3600,
+        );
     }
 
     return normalizedFeature;
@@ -196,7 +226,7 @@ export function normalizeAiConfig(cameraId, config = {}) {
             face: normalizeFeature(rawFeatures.face, "face"),
             licensePlate: normalizeFeature(rawFeatures.licensePlate, "licensePlate"),
             restrictedZone: normalizeFeature(rawFeatures.restrictedZone, "restrictedZone"),
-            tripwire: normalizeFeature(rawFeatures.tripwire, "tripwire"),
+            faceMask: normalizeFeature(rawFeatures.faceMask, "faceMask"),
         },
         shapes: shapes.map((shape, index) => normalizeAiDetectionShape(shape, cameraId, index)),
         updatedAt: config.updatedAt || defaults.updatedAt,
@@ -211,7 +241,7 @@ export function normalizeAiDetectionShape(shape = {}, cameraId = "", index = 0) 
         id: shape.id || `${kind}-${index + 1}`,
         cameraId: shape.cameraId || cameraId,
         kind,
-        label: shape.label || (kind === "tripwire" ? `Tripwire ${index + 1}` : `Zone ${index + 1}`),
+        label: shape.label || `Zone ${index + 1}`,
         points,
         createdAt: shape.createdAt || nowIso(),
     };
@@ -228,6 +258,10 @@ function getBackendFeatureId(type) {
 
     if (type === "restricted_area") {
         return "restrictedZone";
+    }
+
+    if (type === "face_mask") {
+        return "faceMask";
     }
 
     return null;
@@ -327,8 +361,14 @@ export function getAiConfigFromBackendConfigs(cameraId, backendConfigs = [], ima
 
         const isFace = featureId === "face";
         const isPlate = featureId === "licensePlate";
-        const shapeKind = isFace ? "faceZone" : isPlate ? "licensePlateZone" : "restrictedZone";
-        const shapeLabel = isFace ? "Vùng khuôn mặt" : isPlate ? "Vùng biển số" : "Vùng cấm";
+        const shapeKind = AI_FEATURE_SHAPE_KIND[featureId] ?? "restrictedZone";
+        const shapeLabel = isFace
+            ? "Vùng khuôn mặt"
+            : isPlate
+                ? "Vùng biển số"
+                : featureId === "faceMask"
+                    ? "Vùng khẩu trang"
+                    : "Vùng cấm";
         const currentFeature = config.features[featureId];
         const nextFeature = {
             ...currentFeature,
@@ -343,6 +383,12 @@ export function getAiConfigFromBackendConfigs(cameraId, backendConfigs = [], ima
             nextFeature.verificationConfidence = normalizeUiConfidence(item.secondaryConf);
         } else if (isPlate) {
             nextFeature.textRecognitionConfidence = normalizeUiConfidence(item.secondaryConf);
+            const plateExtra = item.extra_data && typeof item.extra_data === "object" ? item.extra_data : {};
+            nextFeature.preTime = clampInteger(plateExtra.pre_time ?? DEFAULT_PRE_TIME, 0, 3600);
+        } else if (featureId === "faceMask") {
+            const extraData = item.extra_data && typeof item.extra_data === "object" ? item.extra_data : {};
+            nextFeature.countConfirm = clampInteger(extraData.count_confirm ?? DEFAULT_COUNT_CONFIRM, 1, 30);
+            nextFeature.reAlertSeconds = clampInteger(extraData.re_alert_seconds ?? DEFAULT_RE_ALERT_SECONDS, 0, 3600);
         }
 
         return {
@@ -402,7 +448,7 @@ export function serializeAiPolygons(shapes = [], imageSize = {}) {
     }
 
     const polygons = shapes
-        .filter((shape) => shape?.kind !== "tripwire" && Array.isArray(shape?.points) && shape.points.length >= 3)
+        .filter((shape) => Array.isArray(shape?.points) && shape.points.length >= 3)
         .map((shape) =>
             shape.points.map((point) => {
                 const clampedPoint = clampPoint(point);
@@ -430,7 +476,7 @@ export function buildRecognitionPayload(config, featureId, imageSize = {}, optio
         : feature?.textRecognitionConfidence;
     const shapes = normalizedConfig.shapes.filter((shape) => shape.kind === shapeKind);
 
-    return {
+    const payload = {
         cameraId: normalizedConfig.cameraId,
         primaryConf: toApiConfidence(feature?.detectionConfidence ?? DEFAULT_CONFIDENCE),
         secondaryConf: toApiConfidence(secondaryConfidence ?? feature?.detectionConfidence ?? DEFAULT_CONFIDENCE),
@@ -440,6 +486,12 @@ export function buildRecognitionPayload(config, featureId, imageSize = {}, optio
         enabled: Boolean(feature?.enabled),
         polygons: serializeAiPolygons(shapes, imageSize),
     };
+
+    if (featureId === "licensePlate") {
+        payload.pre_time = clampInteger(feature?.preTime ?? DEFAULT_PRE_TIME, 0, 3600);
+    }
+
+    return payload;
 }
 
 export function buildRestrictedAreaPayload(config, imageSize = {}, options = {}) {
@@ -455,6 +507,24 @@ export function buildRestrictedAreaPayload(config, imageSize = {}, options = {})
         maxFps: clampInteger(options.maxFps ?? feature?.maxFps ?? DEFAULT_RECOGNITION_MAX_FPS, 1, 25),
         enabled: Boolean(feature?.enabled),
         polygons: serializeAiPolygons(shapes, imageSize),
+    };
+}
+
+export function buildFaceMaskPayload(config, imageSize = {}, options = {}) {
+    const normalizedConfig = normalizeAiConfig(config?.cameraId ?? "", config ?? {});
+    const feature = normalizedConfig.features.faceMask;
+    const shapes = normalizedConfig.shapes.filter((shape) => shape.kind === "faceMaskZone");
+
+    return {
+        cameraId: normalizedConfig.cameraId,
+        primaryConf: toApiConfidence(feature?.detectionConfidence ?? DEFAULT_CONFIDENCE),
+        overlap_threshold: toApiConfidence(feature?.overlapThreshold ?? DEFAULT_OVERLAP_THRESHOLD),
+        tracker: normalizeTracker(feature?.tracker),
+        maxFps: clampInteger(options.maxFps ?? feature?.maxFps ?? DEFAULT_RECOGNITION_MAX_FPS, 1, 25),
+        enabled: Boolean(feature?.enabled),
+        polygons: serializeAiPolygons(shapes, imageSize),
+        count_confirm: clampInteger(feature?.countConfirm ?? DEFAULT_COUNT_CONFIRM, 1, 30),
+        re_alert_seconds: clampInteger(feature?.reAlertSeconds ?? DEFAULT_RE_ALERT_SECONDS, 0, 3600),
     };
 }
 
@@ -528,8 +598,8 @@ export function removeAiDetectionShape(config, shapeId) {
     });
 }
 
-function getMinimumPointCount(kind) {
-    return kind === "tripwire" ? 2 : 3;
+function getMinimumPointCount() {
+    return 3;
 }
 
 export function removeAiDetectionShapePoint(config, shapeId, pointIndex) {
@@ -586,7 +656,7 @@ export function insertAiDetectionShapePoint(config, shapeId, pointIndex, point) 
     return normalizeAiConfig(normalizedConfig.cameraId, {
         ...normalizedConfig,
         shapes: normalizedConfig.shapes.map((shape) => {
-            if (shape.id !== shapeId || shape.kind === "tripwire") {
+            if (shape.id !== shapeId) {
                 return shape;
             }
 

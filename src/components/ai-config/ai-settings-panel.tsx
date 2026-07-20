@@ -20,6 +20,9 @@ export function AiSettingsPanel({
     onConfidenceChange,
     onMaxFpsChange,
     onOverlapThresholdChange,
+    onCountConfirmChange,
+    onReAlertSecondsChange,
+    onPreTimeChange,
     onRemoveShape,
     onReset,
     onSaveRecognition,
@@ -40,6 +43,9 @@ export function AiSettingsPanel({
     onConfidenceChange: (featureId: AiFeatureId, key: AiConfidenceKey, confidence: number) => void;
     onMaxFpsChange: (featureId: AiFeatureId, maxFps: number) => void;
     onOverlapThresholdChange: (featureId: AiFeatureId, overlapThreshold: number) => void;
+    onCountConfirmChange: (featureId: AiFeatureId, countConfirm: number) => void;
+    onReAlertSecondsChange: (featureId: AiFeatureId, reAlertSeconds: number) => void;
+    onPreTimeChange: (featureId: AiFeatureId, preTime: number) => void;
     onRemoveShape: (shapeId: string) => void;
     onReset: () => void;
     onSaveRecognition: () => void;
@@ -52,8 +58,8 @@ export function AiSettingsPanel({
 }) {
     const activeFeatureItem = getAiFeatureItem(activeFeatureId);
     const activeFeature = config ? config.features[activeFeatureId] : null;
-    const canAddZone = activeFeatureItem.shapeKind !== "tripwire" && draftPointCount >= 3;
-    const canSave = activeFeatureId === "face" || activeFeatureId === "licensePlate" || activeFeatureId === "restrictedZone";
+    const canAddZone = draftPointCount >= 3;
+    const canSave = activeFeatureId === "face" || activeFeatureId === "licensePlate" || activeFeatureId === "restrictedZone" || activeFeatureId === "faceMask";
 
     return (
         <aside className="flex min-h-0 flex-col rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -124,12 +130,6 @@ export function AiSettingsPanel({
                             </div>
                         ))}
                     </div>
-
-                    {activeFeatureItem.shapeKind === "tripwire" ? (
-                        <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
-                            Hàng rào ảo tự tạo sau khi chọn đủ 2 điểm.
-                        </p>
-                    ) : null}
                 </section>
 
                 {config && activeFeature ? (
@@ -144,6 +144,9 @@ export function AiSettingsPanel({
                         onMaxFpsChange={onMaxFpsChange}
                         onOverlapThresholdChange={onOverlapThresholdChange}
                         onTrackerChange={onTrackerChange}
+                        onCountConfirmChange={onCountConfirmChange}
+                        onReAlertSecondsChange={onReAlertSecondsChange}
+                        onPreTimeChange={onPreTimeChange}
                     />
                 ) : (
                     <div className="rounded-lg border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">

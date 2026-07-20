@@ -3,9 +3,9 @@ import type { AiDetectionShape } from "@/interface/ai-config";
 import type { AiFeatureItem } from "./ai-config-constants";
 
 function getShapeMeta(shape: AiDetectionShape) {
-    if (shape.kind === "tripwire") {
+    if (shape.kind === "faceMaskZone") {
         return {
-            label: "Hàng rào ảo",
+            label: "Khẩu trang",
             color: "text-amber-700 bg-amber-50 border-amber-200",
         };
     }

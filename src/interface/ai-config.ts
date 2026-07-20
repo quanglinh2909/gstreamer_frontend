@@ -1,6 +1,6 @@
-export type AiFeatureId = "face" | "licensePlate" | "restrictedZone" | "tripwire";
+export type AiFeatureId = "face" | "licensePlate" | "restrictedZone" | "faceMask";
 
-export type AiShapeKind = "faceZone" | "licensePlateZone" | "restrictedZone" | "tripwire";
+export type AiShapeKind = "faceZone" | "licensePlateZone" | "restrictedZone" | "faceMaskZone";
 
 export type AiDrawMode = AiFeatureId;
 
@@ -24,6 +24,9 @@ export interface AiFeatureConfig {
     textRecognitionConfidence?: number;
     overlapThreshold?: number;
     tracker?: AiTracker;
+    countConfirm?: number;
+    reAlertSeconds?: number;
+    preTime?: number;
 }
 
 export type AiFeatureConfigMap = Record<AiFeatureId, AiFeatureConfig>;
@@ -46,7 +49,7 @@ export interface AiCameraConfig {
 
 export type AiConfigMap = Record<string, AiCameraConfig>;
 
-export type AiBackendConfigType = "face_recognition" | "plate_recognition" | "restricted_area";
+export type AiBackendConfigType = "face_recognition" | "plate_recognition" | "restricted_area" | "face_mask";
 
 export interface AiBackendConfig {
     id?: string;

@@ -1,3 +1,5 @@
+import { resolveWebSocketOrigin } from "./websocket-origin";
+
 const UNKNOWN_RESULT_LABEL = "Không xác định";
 
 function asText(value) {
@@ -68,7 +70,7 @@ export function getEventImageUrl(path) {
 }
 
 export function getEventSocketUrl(origin, tab) {
-    const baseUrl = asText(origin).replace(/\/+$/, "");
+    const baseUrl = resolveWebSocketOrigin(origin);
 
     if (!baseUrl) {
         return "";

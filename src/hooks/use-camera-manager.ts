@@ -11,6 +11,7 @@ import {
     getCameraFormDefaults,
     getCameraStats,
 } from "@/lib/camera-view-model";
+import { resolveWebSocketOrigin } from "@/lib/websocket-origin";
 import type {
     CameraFormMode,
     CameraFormState,
@@ -145,7 +146,7 @@ export function useCameraManager(websocketOrigin = "") {
             return;
         }
 
-        const baseUrl = websocketOrigin.trim().replace(/\/+$/, "");
+        const baseUrl = resolveWebSocketOrigin(websocketOrigin);
         const url = `${baseUrl}/camera-state`;
         let socket: WebSocket | null = null;
         let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
