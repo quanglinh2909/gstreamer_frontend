@@ -20,7 +20,21 @@ export interface ParkingLotFormState {
     name: string;
     faceCameraId: string;
     plateCameraId: string;
+    // Ngưỡng giữ dạng chuỗi để người dùng xoá trắng ô rồi gõ lại được; chuyển
+    // sang số ở buildParkingLotPayload.
+    timeExpired: string;
+    matchCooldown: string;
+    barrierDuration: string;
+    maxEditDistance: string;
+    ocrConfidence: string;
 }
+
+export type ParkingLotSettingKey =
+    | "timeExpired"
+    | "matchCooldown"
+    | "barrierDuration"
+    | "maxEditDistance"
+    | "ocrConfidence";
 
 function emptyParkingLotPage(page = 1): ParkingLotPage {
     return {
@@ -77,6 +91,13 @@ function createForm(parkingLot?: ParkingLot | null): ParkingLotFormState {
         name: parkingLot?.name ?? "",
         faceCameraId: parkingLot?.face_camera_id ?? "",
         plateCameraId: parkingLot?.plate_camera_id ?? "",
+        // Mặc định trùng server_default của model, để bãi tạo mới giữ nguyên
+        // hành vi của bản trước khi các ngưỡng này tách ra theo bãi.
+        timeExpired: String(parkingLot?.time_expired ?? 30),
+        matchCooldown: String(parkingLot?.match_cooldown ?? 30),
+        barrierDuration: String(parkingLot?.barrier_duration ?? 0.5),
+        maxEditDistance: String(parkingLot?.max_edit_distance ?? 2),
+        ocrConfidence: String(parkingLot?.ocr_confidence ?? 0.3),
     };
 }
 
@@ -345,6 +366,8 @@ export function useParkingLotManager() {
             setForm((current) => ({ ...current, faceCameraId })),
         setFormPlateCameraId: (plateCameraId: string) =>
             setForm((current) => ({ ...current, plateCameraId })),
+        setFormSetting: (key: ParkingLotSettingKey, value: string) =>
+            setForm((current) => ({ ...current, [key]: value })),
         setSearchText,
         submittedName,
     };

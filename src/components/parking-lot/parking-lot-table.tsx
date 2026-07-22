@@ -25,6 +25,17 @@ function CameraChip({
     );
 }
 
+function SettingChip({ label, value }: { label: string; value: string }) {
+    return (
+        <span className="inline-flex items-baseline gap-1.5 rounded-md bg-slate-100 px-2 py-1">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-400">
+                {label}
+            </span>
+            <span className="text-xs font-semibold text-slate-700">{value}</span>
+        </span>
+    );
+}
+
 export function ParkingLotTable({
     parkingLots,
     cameras,
@@ -45,6 +56,7 @@ export function ParkingLotTable({
                             <th className="px-5 py-4">ID</th>
                             <th className="px-5 py-4">Tên bãi xe</th>
                             <th className="px-5 py-4">Camera kết nối</th>
+                            <th className="px-5 py-4">Ngưỡng hoạt động</th>
                             <th className="px-5 py-4 text-right">Thao tác</th>
                         </tr>
                     </thead>
@@ -71,6 +83,29 @@ export function ParkingLotTable({
                                             label="Biển số"
                                             name={getCameraLabel(cameras, parkingLot.plate_camera_id)}
                                         />
+                                    </div>
+                                </td>
+                                <td className="px-5 py-4">
+                                    <div className="flex flex-wrap gap-1.5">
+                                        <SettingChip label="Ghép cặp" value={`${parkingLot.time_expired}s`} />
+                                        <SettingChip
+                                            label="Chống trùng"
+                                            value={
+                                                parkingLot.match_cooldown === 0
+                                                    ? "tắt"
+                                                    : `${parkingLot.match_cooldown}s`
+                                            }
+                                        />
+                                        <SettingChip label="Barrier" value={`${parkingLot.barrier_duration}s`} />
+                                        <SettingChip
+                                            label="Sai số"
+                                            value={
+                                                parkingLot.max_edit_distance === 0
+                                                    ? "khớp tuyệt đối"
+                                                    : `≤ ${parkingLot.max_edit_distance}`
+                                            }
+                                        />
+                                        <SettingChip label="OCR" value={parkingLot.ocr_confidence.toFixed(2)} />
                                     </div>
                                 </td>
                                 <td className="px-5 py-4">

@@ -480,12 +480,14 @@ export function AiDetectionCanvas({
                                     <Camera size={31} aria-hidden="true" />
                                 </div>
                                 <div>
-                                    <p className="text-sm font-semibold">{camera?.name || "Select a camera"}</p>
+                                    <p className="text-sm font-semibold">{camera?.name || "Chưa chọn camera"}</p>
                                     <p className="mt-1 text-xs text-slate-300">
                                         {snapshotErrorMessage ||
                                             (isSnapshotLoading
                                                 ? "Đang tải snapshot..."
-                                                : camera?.outputRtsp || camera?.rtsp || "Preview placeholder")}
+                                                : camera?.outputRtsp
+                                                    || camera?.rtsp
+                                                    || "Chọn camera ở danh sách bên trái")}
                                     </p>
                                 </div>
                             </div>
@@ -584,8 +586,23 @@ export function AiDetectionCanvas({
                     </svg>
 
                     {!canDraw ? (
-                        <div className="absolute inset-0 flex items-center justify-center bg-slate-950/35 text-sm font-semibold text-white">
-                            {camera ? "Đợi snapshot để vẽ vùng nhận diện" : "Chọn camera để vẽ vùng nhận diện"}
+                        // Lớp này và khối placeholder phía trên đều canh giữa
+                        // tuyệt đối, nên khi chưa có snapshot thì hai dòng chữ
+                        // chồng lên nhau (chữ đè lên icon camera). Chưa có
+                        // snapshot thì placeholder đã nói rõ tình trạng rồi —
+                        // ở đây không in thêm chữ, và cũng không làm mờ vì
+                        // chẳng có ảnh nào để mờ.
+                        <div
+                            className={cn(
+                                "absolute inset-0 flex items-center justify-center text-sm font-semibold text-white",
+                                snapshotUrl && "bg-slate-950/35",
+                            )}
+                        >
+                            {snapshotUrl
+                                ? camera
+                                    ? "Đang tải cấu hình AI..."
+                                    : "Chọn camera để vẽ vùng nhận diện"
+                                : null}
                         </div>
                     ) : null}
 

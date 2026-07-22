@@ -1,4 +1,5 @@
 import { CheckCircle2 } from "lucide-react";
+import { HintLabel } from "@/components/common/hint-label";
 import type { AiConfidenceKey, AiFeatureConfig, AiFeatureId, AiTracker } from "@/interface/ai-config";
 import { cn } from "./ai-config-utils";
 
@@ -13,7 +14,8 @@ export function AiFeatureRow({
     onTrackerChange,
     onCountConfirmChange,
     onReAlertSecondsChange,
-    onPreTimeChange,
+    onBarrierDurationChange,
+    onMinPlateLengthChange,
     onConfidenceChange,
     onToggle,
 }: {
@@ -31,7 +33,8 @@ export function AiFeatureRow({
     onTrackerChange: (featureId: AiFeatureId, tracker: AiTracker) => void;
     onCountConfirmChange: (featureId: AiFeatureId, countConfirm: number) => void;
     onReAlertSecondsChange: (featureId: AiFeatureId, reAlertSeconds: number) => void;
-    onPreTimeChange: (featureId: AiFeatureId, preTime: number) => void;
+    onBarrierDurationChange: (featureId: AiFeatureId, barrierDuration: number) => void;
+    onMinPlateLengthChange: (featureId: AiFeatureId, minPlateLength: number) => void;
     onToggle: (featureId: AiFeatureId) => void;
 }) {
     const isTrackedFeature = id === "face" || id === "licensePlate" || id === "restrictedZone" || id === "faceMask";
@@ -41,7 +44,8 @@ export function AiFeatureRow({
     const tracker = feature.tracker ?? "bytetrack";
     const countConfirm = feature.countConfirm ?? 3;
     const reAlertSeconds = feature.reAlertSeconds ?? 0;
-    const preTime = feature.preTime ?? 10;
+    const barrierDuration = feature.barrierDuration ?? 0.5;
+    const minPlateLength = feature.minPlateLength ?? 8;
 
     return (
         <section className="rounded-lg border border-slate-200 bg-white p-3">
@@ -146,8 +150,8 @@ export function AiFeatureRow({
                 ) : null}
                 {isFaceMask ? (
                     <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="mb-2 block text-xs font-semibold text-slate-500">
+                        <div className="flex flex-col">
+                            <label className="mb-2 block text-xs font-semibold leading-4 text-slate-500">
                                 Số lần xác nhận
                             </label>
                             <input
@@ -156,11 +160,11 @@ export function AiFeatureRow({
                                 max={30}
                                 value={countConfirm}
                                 onChange={(event) => onCountConfirmChange(id, Number(event.target.value))}
-                                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-[#4369ee] focus:outline-none"
+                                className="mt-auto w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-[#4369ee] focus:outline-none"
                             />
                         </div>
-                        <div>
-                            <label className="mb-2 block text-xs font-semibold text-slate-500">
+                        <div className="flex flex-col">
+                            <label className="mb-2 block text-xs font-semibold leading-4 text-slate-500">
                                 Báo lại sau (giây)
                             </label>
                             <input
@@ -169,6 +173,23 @@ export function AiFeatureRow({
                                 max={3600}
                                 value={reAlertSeconds}
                                 onChange={(event) => onReAlertSecondsChange(id, Number(event.target.value))}
+                                className="mt-auto w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-[#4369ee] focus:outline-none"
+                            />
+                        </div>
+                        <div className="col-span-2">
+                            <HintLabel
+                                label="Độ dài xung barrier (giây)"
+                                labelClassName="text-xs font-semibold leading-4 text-slate-500"
+                                className="mb-2"
+                                hint="Thời gian giữ tín hiệu mở barrier khi phát hiện người KHÔNG đeo khẩu trang. Tuỳ phần cứng từng cổng — xung quá ngắn thì barrier không kịp nhận, quá dài thì cổng mở lâu hơn cần thiết."
+                            />
+                            <input
+                                type="number"
+                                min={0.1}
+                                max={10}
+                                step={0.1}
+                                value={barrierDuration}
+                                onChange={(event) => onBarrierDurationChange(id, Number(event.target.value))}
                                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-[#4369ee] focus:outline-none"
                             />
                         </div>
@@ -176,15 +197,28 @@ export function AiFeatureRow({
                 ) : null}
                 {isLicensePlate ? (
                     <div>
-                        <label className="mb-2 block text-xs font-semibold text-slate-500">
-                            Chờ tối thiểu giữa 2 lần mở (giây)
-                        </label>
+                        <HintLabel
+                            label="Số ký tự tối thiểu để lưu sự kiện"
+                            labelClassName="text-xs font-semibold text-slate-500"
+                            className="mb-2"
+                            hint={
+                                <>
+                                    Biển đọc được ngắn hơn mức này sẽ không ghi thành sự kiện, hệ
+                                    thống đợi frame sau đọc lại. Ngưỡng mở barrier nằm riêng ở trang
+                                    <span className="font-semibold text-slate-800">
+                                        {" "}
+                                        Danh sách biển số trắng → Cấu hình
+                                    </span>
+                                    .
+                                </>
+                            }
+                        />
                         <input
                             type="number"
-                            min={0}
-                            max={3600}
-                            value={preTime}
-                            onChange={(event) => onPreTimeChange(id, Number(event.target.value))}
+                            min={1}
+                            max={12}
+                            value={minPlateLength}
+                            onChange={(event) => onMinPlateLengthChange(id, Number(event.target.value))}
                             className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-[#4369ee] focus:outline-none"
                         />
                     </div>

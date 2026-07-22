@@ -22,7 +22,8 @@ export function AiSettingsPanel({
     onOverlapThresholdChange,
     onCountConfirmChange,
     onReAlertSecondsChange,
-    onPreTimeChange,
+    onBarrierDurationChange,
+    onMinPlateLengthChange,
     onRemoveShape,
     onReset,
     onSaveRecognition,
@@ -45,7 +46,8 @@ export function AiSettingsPanel({
     onOverlapThresholdChange: (featureId: AiFeatureId, overlapThreshold: number) => void;
     onCountConfirmChange: (featureId: AiFeatureId, countConfirm: number) => void;
     onReAlertSecondsChange: (featureId: AiFeatureId, reAlertSeconds: number) => void;
-    onPreTimeChange: (featureId: AiFeatureId, preTime: number) => void;
+    onBarrierDurationChange: (featureId: AiFeatureId, barrierDuration: number) => void;
+    onMinPlateLengthChange: (featureId: AiFeatureId, minPlateLength: number) => void;
     onRemoveShape: (shapeId: string) => void;
     onReset: () => void;
     onSaveRecognition: () => void;
@@ -146,7 +148,8 @@ export function AiSettingsPanel({
                         onTrackerChange={onTrackerChange}
                         onCountConfirmChange={onCountConfirmChange}
                         onReAlertSecondsChange={onReAlertSecondsChange}
-                        onPreTimeChange={onPreTimeChange}
+                        onBarrierDurationChange={onBarrierDurationChange}
+                        onMinPlateLengthChange={onMinPlateLengthChange}
                     />
                 ) : (
                     <div className="rounded-lg border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">

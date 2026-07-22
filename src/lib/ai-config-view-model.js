@@ -20,7 +20,8 @@ const DEFAULT_CONFIDENCE = 70;
 const DEFAULT_OVERLAP_THRESHOLD = 30;
 const DEFAULT_COUNT_CONFIRM = 3;
 const DEFAULT_RE_ALERT_SECONDS = 0;
-const DEFAULT_PRE_TIME = 10;
+const DEFAULT_BARRIER_DURATION = 0.5;
+const DEFAULT_MIN_PLATE_LENGTH = 8;
 const DEFAULT_MAX_FPS = 10;
 const DEFAULT_RECOGNITION_MAX_FPS = 5;
 const DEFAULT_TRACKER = /** @type {const} */ ("bytetrack");
@@ -104,7 +105,7 @@ function createDefaultFeatures() {
             textRecognitionConfidence: DEFAULT_CONFIDENCE,
             overlapThreshold: DEFAULT_OVERLAP_THRESHOLD,
             tracker: DEFAULT_TRACKER,
-            preTime: DEFAULT_PRE_TIME,
+            minPlateLength: DEFAULT_MIN_PLATE_LENGTH,
         },
         restrictedZone: {
             enabled: false,
@@ -121,6 +122,7 @@ function createDefaultFeatures() {
             tracker: DEFAULT_TRACKER,
             countConfirm: DEFAULT_COUNT_CONFIRM,
             reAlertSeconds: DEFAULT_RE_ALERT_SECONDS,
+            barrierDuration: DEFAULT_BARRIER_DURATION,
         },
     };
 }
@@ -158,10 +160,10 @@ function normalizeFeature(feature, featureId) {
             0,
             100,
         );
-        normalizedFeature.preTime = clampInteger(
-            feature?.preTime ?? DEFAULT_PRE_TIME,
-            0,
-            3600,
+        normalizedFeature.minPlateLength = clampInteger(
+            feature?.minPlateLength ?? DEFAULT_MIN_PLATE_LENGTH,
+            1,
+            12,
         );
     }
 
@@ -184,6 +186,11 @@ function normalizeFeature(feature, featureId) {
             feature?.reAlertSeconds ?? DEFAULT_RE_ALERT_SECONDS,
             0,
             3600,
+        );
+        normalizedFeature.barrierDuration = clampNumber(
+            feature?.barrierDuration ?? DEFAULT_BARRIER_DURATION,
+            0.1,
+            10,
         );
     }
 
@@ -384,11 +391,16 @@ export function getAiConfigFromBackendConfigs(cameraId, backendConfigs = [], ima
         } else if (isPlate) {
             nextFeature.textRecognitionConfidence = normalizeUiConfidence(item.secondaryConf);
             const plateExtra = item.extra_data && typeof item.extra_data === "object" ? item.extra_data : {};
-            nextFeature.preTime = clampInteger(plateExtra.pre_time ?? DEFAULT_PRE_TIME, 0, 3600);
+            nextFeature.minPlateLength = clampInteger(
+                plateExtra.min_plate_length ?? DEFAULT_MIN_PLATE_LENGTH,
+                1,
+                12,
+            );
         } else if (featureId === "faceMask") {
             const extraData = item.extra_data && typeof item.extra_data === "object" ? item.extra_data : {};
             nextFeature.countConfirm = clampInteger(extraData.count_confirm ?? DEFAULT_COUNT_CONFIRM, 1, 30);
             nextFeature.reAlertSeconds = clampInteger(extraData.re_alert_seconds ?? DEFAULT_RE_ALERT_SECONDS, 0, 3600);
+            nextFeature.barrierDuration = clampNumber(extraData.barrier_duration ?? DEFAULT_BARRIER_DURATION, 0.1, 10);
         }
 
         return {
@@ -488,7 +500,11 @@ export function buildRecognitionPayload(config, featureId, imageSize = {}, optio
     };
 
     if (featureId === "licensePlate") {
-        payload.pre_time = clampInteger(feature?.preTime ?? DEFAULT_PRE_TIME, 0, 3600);
+        payload.min_plate_length = clampInteger(
+            feature?.minPlateLength ?? DEFAULT_MIN_PLATE_LENGTH,
+            1,
+            12,
+        );
     }
 
     return payload;
@@ -525,6 +541,7 @@ export function buildFaceMaskPayload(config, imageSize = {}, options = {}) {
         polygons: serializeAiPolygons(shapes, imageSize),
         count_confirm: clampInteger(feature?.countConfirm ?? DEFAULT_COUNT_CONFIRM, 1, 30),
         re_alert_seconds: clampInteger(feature?.reAlertSeconds ?? DEFAULT_RE_ALERT_SECONDS, 0, 3600),
+        barrier_duration: clampNumber(feature?.barrierDuration ?? DEFAULT_BARRIER_DURATION, 0.1, 10),
     };
 }
 

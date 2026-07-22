@@ -1,6 +1,7 @@
 import { AlertTriangle, Images, RefreshCw, ScanFace, ScanLine, ShieldAlert } from "lucide-react";
 import type { EventManager } from "@/hooks/use-event-manager";
 import type { ICameraResponse } from "@/interface/camera";
+import { AppSelect } from "@/components/common/app-select";
 import type { RecognitionEventTab } from "@/interface/recognition-event";
 import { EventCard } from "./event-card";
 import { EventImageModal } from "./event-image-modal";
@@ -150,12 +151,12 @@ export function EventDashboard({ manager }: { manager: EventManager }) {
 
                         <label className="flex min-w-[250px] flex-col gap-1.5">
 
-                            <select
+                            <AppSelect
                                 aria-label="Lọc theo camera"
                                 value={manager.selectedCameraId}
                                 onChange={(event) => manager.handleSelectCamera(event.target.value)}
                                 disabled={manager.isCameraLoading}
-                                className="h-10 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-800 outline-none transition-colors focus:border-[#4369ee] focus:bg-white disabled:opacity-60"
+                                className="h-10 bg-slate-50 font-semibold text-slate-800 focus:bg-white"
                             >
                                 <option value="">Tất cả camera</option>
                                 {manager.cameras.map((camera) => (
@@ -163,7 +164,7 @@ export function EventDashboard({ manager }: { manager: EventManager }) {
                                         {camera.name || camera.id}
                                     </option>
                                 ))}
-                            </select>
+                            </AppSelect>
                         </label>
 
 

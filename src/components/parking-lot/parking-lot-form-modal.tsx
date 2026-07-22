@@ -1,11 +1,66 @@
 import { type FormEvent, useEffect } from "react";
 import { ArrowRight, LoaderCircle, Save, ScanLine, SmilePlus, X } from "lucide-react";
+import { AppSelect } from "@/components/common/app-select";
+import { HintLabel } from "@/components/common/hint-label";
 import type { ParkingLot } from "@/interface/parking-lot";
 import type { ICameraResponse } from "@/interface/camera";
 import type {
     ParkingLotFormMode,
     ParkingLotFormState,
+    ParkingLotSettingKey,
 } from "@/hooks/use-parking-lot-manager";
+
+// Mô tả nằm sau dấu "?" thay vì in thẳng ra: 5 đoạn giải thích dài sẽ nhấn
+// chìm chính các ô nhập. min/max khớp với ràng buộc của backend.
+const SETTING_FIELDS: Array<{
+    key: ParkingLotSettingKey;
+    label: string;
+    hint: string;
+    min: number;
+    max: number;
+    step: number;
+}> = [
+    {
+        key: "timeExpired",
+        label: "Cửa sổ ghép cặp (giây)",
+        hint: "Một khuôn mặt đã nhận diện chờ tối đa ngần này giây để biển số của chính người đó xuất hiện ở camera kia, và ngược lại. Hai camera đặt càng xa, xe đi càng chậm thì cần càng dài; để quá dài thì xe sau dễ bị ghép nhầm với người của xe trước.",
+        min: 1,
+        max: 600,
+        step: 1,
+    },
+    {
+        key: "matchCooldown",
+        label: "Chống trùng lượt xe (giây)",
+        hint: "Một biển số ở làn này chỉ tạo MỘT sự kiện trong ngần này giây. Chặn ca 2 người ngồi cùng xe: cả hai khuôn mặt đều khớp cùng một biển, không chặn thì tạo 2 dòng và mở barrier 2 lần. Đặt xấp xỉ thời gian một lượt xe rời khỏi làn.",
+        min: 0,
+        max: 600,
+        step: 1,
+    },
+    {
+        key: "barrierDuration",
+        label: "Độ dài xung barrier (giây)",
+        hint: "Thời gian giữ tín hiệu mở barrier. Tuỳ phần cứng từng cổng — xung quá ngắn thì barrier không kịp nhận, quá dài thì cổng mở lâu hơn cần thiết.",
+        min: 0.1,
+        max: 10,
+        step: 0.1,
+    },
+    {
+        key: "maxEditDistance",
+        label: "Sai số ký tự cho phép",
+        hint: "Số ký tự tối đa được phép sai giữa biển OCR đọc được và biển đã đăng ký của cư dân. 0 = khớp tuyệt đối. Biển ngắn còn bị siết thêm bởi luật an toàn của hệ thống (biển 4 ký tự luôn phải khớp tuyệt đối dù đặt bao nhiêu).",
+        min: 0,
+        max: 3,
+        step: 1,
+    },
+    {
+        key: "ocrConfidence",
+        label: "Ngưỡng tin cậy OCR (0 – 1)",
+        hint: "Bãi xe tự đọc lại biển bằng ngưỡng này, độc lập với ngưỡng của Cấu hình AI — siết ở đây không làm thay đổi dữ liệu sự kiện biển số. Ký tự yếu hơn bị LOẠI khỏi chuỗi, làm biển ngắn đi; lưu ý biển thiếu một ký tự chỉ cách biển thật đúng 1 đơn vị, nên nếu Sai số ký tự cho phép ≥ 1 thì nó vẫn có thể khớp.",
+        min: 0,
+        max: 1,
+        step: 0.05,
+    },
+];
 
 function CameraSelect({
     icon: Icon,
@@ -30,11 +85,12 @@ function CameraSelect({
                 <Icon size={14} className="text-[#4369ee]" aria-hidden="true" />
                 {label}
             </span>
-            <select
+            <AppSelect
                 required
                 value={value}
                 onChange={(event) => onChange(event.target.value)}
-                className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-[#4369ee]"
+                wrapperClassName="mt-2"
+                className="h-11"
             >
                 <option value="" disabled>
                     {placeholder}
@@ -45,7 +101,7 @@ function CameraSelect({
                         {camera.name || camera.id}
                     </option>
                 ))}
-            </select>
+            </AppSelect>
         </label>
     );
 }
@@ -62,6 +118,7 @@ export function ParkingLotFormModal({
     onNameChange,
     onFaceCameraChange,
     onPlateCameraChange,
+    onSettingChange,
 }: {
     mode: ParkingLotFormMode;
     parkingLot: ParkingLot | null;
@@ -74,6 +131,7 @@ export function ParkingLotFormModal({
     onNameChange: (name: string) => void;
     onFaceCameraChange: (cameraId: string) => void;
     onPlateCameraChange: (cameraId: string) => void;
+    onSettingChange: (key: ParkingLotSettingKey, value: string) => void;
 }) {
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
@@ -91,7 +149,7 @@ export function ParkingLotFormModal({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
             <form
                 onSubmit={onSubmit}
-                className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl"
+                className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
             >
                 <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
                     <div>
@@ -113,7 +171,7 @@ export function ParkingLotFormModal({
                     </button>
                 </header>
 
-                <div className="space-y-5 p-5">
+                <div className="flex-1 space-y-5 overflow-y-auto p-5">
                     {errorMessage ? (
                         <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
                             {errorMessage}
@@ -161,6 +219,48 @@ export function ParkingLotFormModal({
                             onChange={onPlateCameraChange}
                         />
                     </div>
+
+                    <section className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <div>
+                            <h3 className="text-sm font-semibold text-slate-900">Ngưỡng hoạt động</h3>
+                            <p className="mt-1 text-xs leading-5 text-slate-500">
+                                Cổng xe máy và cổng ô tô cần giá trị khác nhau. Di chuột hoặc bấm
+                                vào dấu <span className="font-semibold">?</span> để xem giải thích.
+                            </p>
+                        </div>
+
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            {SETTING_FIELDS.map((field, index) => (
+                                // h-full + flex-1 ở phần nhãn: nhãn dài ngắn khác
+                                // nhau nên có cái xuống 2 dòng, có cái 1 dòng. Ô
+                                // lưới tự giãn bằng nhau, phần nhãn nuốt hết chỗ
+                                // thừa và đẩy input xuống đáy — nhờ vậy các input
+                                // trên cùng một hàng luôn thẳng nhau.
+                                <label key={field.key} className="flex h-full flex-col">
+                                    <span className="flex-1">
+                                        <HintLabel
+                                            label={field.label}
+                                            hint={field.hint}
+                                            // Hai ô đầu nằm sát mép trên vùng cuộn:
+                                            // bong bóng mở lên trên sẽ bị cắt mất.
+                                            placement={index < 2 ? "bottom" : "top"}
+                                            labelClassName="text-xs font-semibold uppercase leading-4 tracking-[0.08em] text-slate-500"
+                                        />
+                                    </span>
+                                    <input
+                                        type="number"
+                                        required
+                                        min={field.min}
+                                        max={field.max}
+                                        step={field.step}
+                                        value={form[field.key]}
+                                        onChange={(event) => onSettingChange(field.key, event.target.value)}
+                                        className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-[#4369ee]"
+                                    />
+                                </label>
+                            ))}
+                        </div>
+                    </section>
                 </div>
 
                 <footer className="flex justify-end gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4">

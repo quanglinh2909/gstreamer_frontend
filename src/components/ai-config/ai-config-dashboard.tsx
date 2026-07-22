@@ -105,7 +105,8 @@ export function AiConfigDashboard({ manager }: { manager: AiConfigManager }) {
                         onTrackerChange={manager.setFeatureTracker}
                         onCountConfirmChange={manager.setFeatureCountConfirm}
                         onReAlertSecondsChange={manager.setFeatureReAlertSeconds}
-                        onPreTimeChange={manager.setFeaturePreTime}
+                        onBarrierDurationChange={manager.setFeatureBarrierDuration}
+                        onMinPlateLengthChange={manager.setFeatureMinPlateLength}
                         onRemoveShape={manager.removeShape}
                         onReset={manager.resetCurrentConfig}
                         onSaveRecognition={manager.saveActiveRecognitionConfig}

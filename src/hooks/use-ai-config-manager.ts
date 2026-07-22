@@ -350,9 +350,15 @@ export function useAiConfigManager() {
         );
     };
 
-    const setFeaturePreTime = (featureId: AiFeatureId, preTime: number) => {
+    const setFeatureBarrierDuration = (featureId: AiFeatureId, barrierDuration: number) => {
         updateSelectedConfig((config) =>
-            updateAiFeature(config, featureId, { preTime }) as AiCameraConfig,
+            updateAiFeature(config, featureId, { barrierDuration }) as AiCameraConfig,
+        );
+    };
+
+    const setFeatureMinPlateLength = (featureId: AiFeatureId, minPlateLength: number) => {
+        updateSelectedConfig((config) =>
+            updateAiFeature(config, featureId, { minPlateLength }) as AiCameraConfig,
         );
     };
 
@@ -546,7 +552,8 @@ export function useAiConfigManager() {
         setFeatureTracker,
         setFeatureCountConfirm,
         setFeatureReAlertSeconds,
-        setFeaturePreTime,
+        setFeatureBarrierDuration,
+        setFeatureMinPlateLength,
         snapshotErrorMessage,
         snapshotSize,
         snapshotUrl,

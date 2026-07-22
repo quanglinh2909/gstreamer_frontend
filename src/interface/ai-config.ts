@@ -26,7 +26,12 @@ export interface AiFeatureConfig {
     tracker?: AiTracker;
     countConfirm?: number;
     reAlertSeconds?: number;
-    preTime?: number;
+    // Khẩu trang: độ dài xung mở barrier (giây) khi phát hiện người không đeo.
+    barrierDuration?: number;
+    // Biển số: số ký tự tối thiểu để GHI một sự kiện. Ngưỡng của nhánh mở
+    // barrier nằm ở trang "Danh sách biển số trắng" → tab Cấu hình, không
+    // phải ở đây.
+    minPlateLength?: number;
 }
 
 export type AiFeatureConfigMap = Record<AiFeatureId, AiFeatureConfig>;

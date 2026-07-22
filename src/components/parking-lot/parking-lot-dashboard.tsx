@@ -226,6 +226,7 @@ export function ParkingLotDashboard({ manager }: { manager: ParkingLotManager })
                     onNameChange={manager.setFormName}
                     onFaceCameraChange={manager.setFormFaceCameraId}
                     onPlateCameraChange={manager.setFormPlateCameraId}
+                    onSettingChange={manager.setFormSetting}
                 />
             ) : null}
 
