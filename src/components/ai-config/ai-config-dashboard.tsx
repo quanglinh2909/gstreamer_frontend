@@ -101,12 +101,14 @@ export function AiConfigDashboard({ manager }: { manager: AiConfigManager }) {
                         onClearDraft={manager.clearDraft}
                         onConfidenceChange={manager.setFeatureConfidence}
                         onMaxFpsChange={manager.setFeatureMaxFps}
+                        onSaveDetectionsChange={manager.setFeatureSaveDetections}
                         onOverlapThresholdChange={manager.setFeatureOverlapThreshold}
                         onTrackerChange={manager.setFeatureTracker}
                         onCountConfirmChange={manager.setFeatureCountConfirm}
                         onReAlertSecondsChange={manager.setFeatureReAlertSeconds}
                         onBarrierDurationChange={manager.setFeatureBarrierDuration}
                         onMinPlateLengthChange={manager.setFeatureMinPlateLength}
+                        onDetectModelChange={manager.setFeatureDetectModel}
                         onRemoveShape={manager.removeShape}
                         onReset={manager.resetCurrentConfig}
                         onSaveRecognition={manager.saveActiveRecognitionConfig}

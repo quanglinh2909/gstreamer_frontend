@@ -2,6 +2,7 @@ import { CheckCircle2 } from "lucide-react";
 import { HintLabel } from "@/components/common/hint-label";
 import type { AiConfidenceKey, AiFeatureConfig, AiFeatureId, AiTracker } from "@/interface/ai-config";
 import { cn } from "./ai-config-utils";
+import { RestrictedModelPicker } from "./restricted-model-picker";
 
 export function AiFeatureRow({
     confidenceControls,
@@ -16,7 +17,9 @@ export function AiFeatureRow({
     onReAlertSecondsChange,
     onBarrierDurationChange,
     onMinPlateLengthChange,
+    onDetectModelChange,
     onConfidenceChange,
+    onSaveDetectionsChange,
     onToggle,
 }: {
     confidenceControls: Array<{
@@ -29,12 +32,17 @@ export function AiFeatureRow({
     label: string;
     onConfidenceChange: (featureId: AiFeatureId, key: AiConfidenceKey, confidence: number) => void;
     onMaxFpsChange: (featureId: AiFeatureId, maxFps: number) => void;
+    onSaveDetectionsChange: (featureId: AiFeatureId, saveDetections: boolean) => void;
     onOverlapThresholdChange: (featureId: AiFeatureId, overlapThreshold: number) => void;
     onTrackerChange: (featureId: AiFeatureId, tracker: AiTracker) => void;
     onCountConfirmChange: (featureId: AiFeatureId, countConfirm: number) => void;
     onReAlertSecondsChange: (featureId: AiFeatureId, reAlertSeconds: number) => void;
     onBarrierDurationChange: (featureId: AiFeatureId, barrierDuration: number) => void;
     onMinPlateLengthChange: (featureId: AiFeatureId, minPlateLength: number) => void;
+    onDetectModelChange: (
+        featureId: AiFeatureId,
+        patch: { modelFile?: string; modelType?: string; classFilter?: string },
+    ) => void;
     onToggle: (featureId: AiFeatureId) => void;
 }) {
     const isTrackedFeature = id === "face" || id === "licensePlate" || id === "restrictedZone" || id === "faceMask";
@@ -148,6 +156,14 @@ export function AiFeatureRow({
                         </fieldset>
                     </>
                 ) : null}
+                {id === "restrictedZone" ? (
+                    <RestrictedModelPicker
+                        modelFile={feature.modelFile}
+                        modelType={feature.modelType}
+                        classFilter={feature.classFilter}
+                        onChange={(patch) => onDetectModelChange(id, patch)}
+                    />
+                ) : null}
                 {isFaceMask ? (
                     <div className="grid grid-cols-2 gap-3">
                         <div className="flex flex-col">
@@ -223,6 +239,27 @@ export function AiFeatureRow({
                         />
                     </div>
                 ) : null}
+                {/* Lưu khung phát hiện để XEM LẠI vẽ được box/pose và tìm sự
+                    kiện theo vùng vẽ trên hình. Mặc định TẮT vì đây là ghi
+                    liên tục theo mỗi khung hình. */}
+                <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-slate-200 p-3">
+                    <input
+                        type="checkbox"
+                        checked={Boolean(feature.saveDetections)}
+                        onChange={(event) => onSaveDetectionsChange(id, event.target.checked)}
+                        className="mt-0.5 h-4 w-4 accent-[#4369ee]"
+                    />
+                    <span className="min-w-0">
+                        <span className="block text-xs font-semibold text-slate-900">
+                            Lưu khung phát hiện để xem lại
+                        </span>
+                        <span className="mt-0.5 block text-[11px] leading-snug text-slate-500">
+                            Bật thì khi xem lại bản ghi sẽ vẽ được khung/khớp xương, và
+                            vẽ một vùng trên hình để tìm sự kiện đã đi qua vùng đó.
+                            Tốn thêm ~10 MB/ngày cho mỗi AI.
+                        </span>
+                    </span>
+                </label>
                 <div>
                     <div className="mb-2 flex items-center justify-between text-xs font-semibold text-slate-500">
                         <span>Max FPS</span>

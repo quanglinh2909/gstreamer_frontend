@@ -60,6 +60,14 @@ const SETTING_FIELDS: Array<{
         max: 1,
         step: 0.05,
     },
+    {
+        key: "faceConfidence",
+        label: "Độ chính xác khuôn mặt (0 – 1)",
+        hint: "Điểm khớp khuôn mặt tối thiểu để coi người trước camera là cư dân rồi mới mở barrier. Riêng cho bãi xe, không đụng tới ngưỡng lưu sự kiện khuôn mặt của Cấu hình AI. Đặt cao hơn thì ít nhận nhầm người lạ thành cư dân (an toàn hơn) nhưng dễ bỏ sót người thật; đặt thấp hơn thì ngược lại.",
+        min: 0,
+        max: 1,
+        step: 0.05,
+    },
 ];
 
 function CameraSelect({

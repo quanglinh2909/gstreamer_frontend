@@ -176,6 +176,24 @@ function normalizeFeature(feature, featureId) {
         normalizedFeature.tracker = normalizeTracker(feature?.tracker);
     }
 
+    if (featureId === "restrictedZone") {
+        // Model phát hiện + lọc lớp chọn được từ giao diện. Chỉ mang theo khi là
+        // chuỗi (normalizeFeature dựng object mới nên field lạ sẽ bị rơi mất);
+        // để trống = backend dùng mặc định của RESTRICTED_AREA_SPEC.
+        if (typeof feature?.modelFile === "string") {
+            normalizedFeature.modelFile = feature.modelFile;
+        }
+        if (typeof feature?.modelType === "string") {
+            normalizedFeature.modelType = feature.modelType;
+        }
+        if (typeof feature?.classFilter === "string") {
+            normalizedFeature.classFilter = feature.classFilter;
+        }
+    }
+
+    // Lưu khung phát hiện xuống DB (mọi loại AI). MẶC ĐỊNH TẮT.
+    normalizedFeature.saveDetections = Boolean(feature?.saveDetections);
+
     if (featureId === "faceMask") {
         normalizedFeature.countConfirm = clampInteger(
             feature?.countConfirm ?? DEFAULT_COUNT_CONFIRM,
@@ -384,6 +402,7 @@ export function getAiConfigFromBackendConfigs(cameraId, backendConfigs = [], ima
             overlapThreshold: normalizeUiConfidence(item.overlap_threshold, DEFAULT_OVERLAP_THRESHOLD),
             tracker: normalizeTracker(item.tracker),
             maxFps: clampInteger(item.maxFps ?? DEFAULT_RECOGNITION_MAX_FPS, 1, 25),
+            saveDetections: Boolean(item.saveDetections ?? item.save_detections),
         };
 
         if (isFace) {
@@ -497,6 +516,8 @@ export function buildRecognitionPayload(config, featureId, imageSize = {}, optio
         maxFps: clampInteger(options.maxFps ?? feature?.maxFps ?? DEFAULT_RECOGNITION_MAX_FPS, 1, 25),
         enabled: Boolean(feature?.enabled),
         polygons: serializeAiPolygons(shapes, imageSize),
+        // Ghi khung phát hiện xuống DB để xem lại / tìm theo vùng.
+        saveDetections: Boolean(feature?.saveDetections),
     };
 
     if (featureId === "licensePlate") {
@@ -515,7 +536,7 @@ export function buildRestrictedAreaPayload(config, imageSize = {}, options = {})
     const feature = normalizedConfig.features.restrictedZone;
     const shapes = normalizedConfig.shapes.filter((shape) => shape.kind === "restrictedZone");
 
-    return {
+    const payload = {
         cameraId: normalizedConfig.cameraId,
         primaryConf: toApiConfidence(feature?.detectionConfidence ?? DEFAULT_CONFIDENCE),
         overlap_threshold: toApiConfidence(feature?.overlapThreshold ?? DEFAULT_OVERLAP_THRESHOLD),
@@ -523,7 +544,15 @@ export function buildRestrictedAreaPayload(config, imageSize = {}, options = {})
         maxFps: clampInteger(options.maxFps ?? feature?.maxFps ?? DEFAULT_RECOGNITION_MAX_FPS, 1, 25),
         enabled: Boolean(feature?.enabled),
         polygons: serializeAiPolygons(shapes, imageSize),
+        // Ghi khung phát hiện xuống DB để xem lại / tìm theo vùng.
+        saveDetections: Boolean(feature?.saveDetections),
     };
+    // Chỉ gửi khi có giá trị: bỏ trống -> backend giữ mặc định. Riêng
+    // classFilter chuỗi rỗng LÀ một lựa chọn hợp lệ (giữ mọi lớp) nên vẫn gửi.
+    if (feature?.modelFile) payload.modelFile = feature.modelFile;
+    if (feature?.modelType) payload.modelType = feature.modelType;
+    if (typeof feature?.classFilter === "string") payload.classFilter = feature.classFilter;
+    return payload;
 }
 
 export function buildFaceMaskPayload(config, imageSize = {}, options = {}) {
@@ -539,6 +568,8 @@ export function buildFaceMaskPayload(config, imageSize = {}, options = {}) {
         maxFps: clampInteger(options.maxFps ?? feature?.maxFps ?? DEFAULT_RECOGNITION_MAX_FPS, 1, 25),
         enabled: Boolean(feature?.enabled),
         polygons: serializeAiPolygons(shapes, imageSize),
+        // Ghi khung phát hiện xuống DB để xem lại / tìm theo vùng.
+        saveDetections: Boolean(feature?.saveDetections),
         count_confirm: clampInteger(feature?.countConfirm ?? DEFAULT_COUNT_CONFIRM, 1, 30),
         re_alert_seconds: clampInteger(feature?.reAlertSeconds ?? DEFAULT_RE_ALERT_SECONDS, 0, 3600),
         barrier_duration: clampNumber(feature?.barrierDuration ?? DEFAULT_BARRIER_DURATION, 0.1, 10),

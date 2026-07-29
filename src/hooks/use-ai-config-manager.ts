@@ -144,6 +144,40 @@ export function useAiConfigManager() {
         };
     }, [selectedCameraId]);
 
+    // Vùng cấm: nạp model + lọc lớp đang áp cho camera này. Engine chỉ lưu
+    // đường dẫn model nên tên file/lớp được backend Python giữ trong
+    // ai_configs.extra_data; không nạp thì giao diện luôn hiện giá trị rỗng.
+    useEffect(() => {
+        if (!selectedCameraId) return;
+        let cancelled = false;
+        void (async () => {
+            try {
+                const { data } = await restrictedAreaApi.settings(selectedCameraId);
+                if (cancelled || !data) return;
+                setConfigs((currentConfigs) => {
+                    const current = (currentConfigs[selectedCameraId] ??
+                        getAiConfigDefaults(selectedCameraId)) as AiCameraConfig;
+                    return {
+                        ...currentConfigs,
+                        [selectedCameraId]: updateAiFeature(current, "restrictedZone", {
+                            modelFile: data.modelFile,
+                            modelType: data.modelType,
+                            classFilter: data.classFilter,
+                        }) as AiCameraConfig,
+                    };
+                });
+            } catch {
+                // Không chặn luồng cấu hình chính nếu endpoint lỗi.
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+        // Phụ thuộc cả config đã nạp: loadAiConfig THAY THẾ toàn bộ config của
+        // camera nên nếu chỉ chạy một lần, patch model/lớp sẽ bị ghi đè mất.
+        // Chạy lại sau khi config về thì patch được áp lên bản mới nhất.
+    }, [selectedCameraId, backendConfigsByCamera[selectedCameraId]]);
+
     useEffect(() => {
         if (typeof window === "undefined") {
             return;
@@ -326,6 +360,12 @@ export function useAiConfigManager() {
         );
     };
 
+    const setFeatureSaveDetections = (featureId: AiFeatureId, saveDetections: boolean) => {
+        updateSelectedConfig((config) =>
+            updateAiFeature(config, featureId, { saveDetections }) as AiCameraConfig,
+        );
+    };
+
     const setFeatureOverlapThreshold = (featureId: AiFeatureId, overlapThreshold: number) => {
         updateSelectedConfig((config) =>
             updateAiFeature(config, featureId, { overlapThreshold }) as AiCameraConfig,
@@ -335,6 +375,16 @@ export function useAiConfigManager() {
     const setFeatureTracker = (featureId: AiFeatureId, tracker: AiTracker) => {
         updateSelectedConfig((config) =>
             updateAiFeature(config, featureId, { tracker }) as AiCameraConfig,
+        );
+    };
+
+    // Vùng cấm: đổi model / loại model / lọc lớp (một hàm chung, patch từng phần).
+    const setFeatureDetectModel = (
+        featureId: AiFeatureId,
+        patch: { modelFile?: string; modelType?: string; classFilter?: string },
+    ) => {
+        updateSelectedConfig((config) =>
+            updateAiFeature(config, featureId, patch) as AiCameraConfig,
         );
     };
 
@@ -548,8 +598,10 @@ export function useAiConfigManager() {
         selectedConfig,
         setFeatureConfidence,
         setFeatureMaxFps,
+        setFeatureSaveDetections,
         setFeatureOverlapThreshold,
         setFeatureTracker,
+        setFeatureDetectModel,
         setFeatureCountConfirm,
         setFeatureReAlertSeconds,
         setFeatureBarrierDuration,

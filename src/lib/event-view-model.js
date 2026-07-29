@@ -69,7 +69,7 @@ export function getEventImageUrl(path) {
     return `/api/backend/${imagePath.replace(/^\/+/, "")}`;
 }
 
-export function getEventSocketUrl(origin, tab) {
+export function getEventSocketUrl(origin, tab, cameraId = "") {
     const baseUrl = resolveWebSocketOrigin(origin);
 
     if (!baseUrl) {
@@ -81,9 +81,15 @@ export function getEventSocketUrl(origin, tab) {
             ? "plate-events"
             : tab === "restricted"
                 ? "restricted-area-events"
-                : "face-events";
+                : tab === "mask"
+                    ? "mask-events"
+                    : "face-events";
 
-    return `${baseUrl}/${endpoint}`;
+    // camera_id ràng buộc socket chỉ nhận sự kiện của MỘT camera (trang Xem
+    // lại review một camera). Bỏ trống -> nhận mọi camera (tường Live View).
+    const query = cameraId ? `?camera_id=${encodeURIComponent(cameraId)}` : "";
+
+    return `${baseUrl}/${endpoint}${query}`;
 }
 
 export function getVisibleEventPages(currentPage, totalPages) {

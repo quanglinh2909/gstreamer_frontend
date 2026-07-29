@@ -61,6 +61,10 @@ export function resolveWebSocketOrigin(origin: string | null | undefined): strin
         return fromCurrentHost(parsed.pathname.replace(/\/+$/, ""));
     }
 
-    // Host thật do người cấu hình chỉ định -> tôn trọng.
-    return raw;
+    // Host thật do người cấu hình chỉ định -> tôn trọng, NHƯNG ép scheme sang
+    // ws/wss: `new WebSocket("http://...")` bị trình duyệt ném lỗi, nên cấu hình
+    // ghi "http://host:port/ws" (hay dùng cho tiện) sẽ chết câm nếu trả nguyên.
+    if (parsed.protocol === "http:") parsed.protocol = "ws:";
+    else if (parsed.protocol === "https:") parsed.protocol = "wss:";
+    return parsed.toString().replace(/\/+$/, "");
 }

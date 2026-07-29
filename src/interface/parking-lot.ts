@@ -12,6 +12,9 @@ export interface ParkingLotSettings {
     max_edit_distance: number;
     // Ngưỡng tin cậy từng ký tự OCR khi bãi đọc lại biển. 0..1.
     ocr_confidence: number;
+    // Độ chính xác khuôn mặt: điểm khớp tối thiểu để coi là cư dân rồi mở
+    // barrier. 0..1. Cao hơn = ít nhận nhầm người lạ nhưng dễ bỏ sót.
+    face_confidence: number;
 }
 
 export interface ParkingLot extends ParkingLotSettings {

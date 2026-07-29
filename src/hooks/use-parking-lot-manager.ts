@@ -27,6 +27,7 @@ export interface ParkingLotFormState {
     barrierDuration: string;
     maxEditDistance: string;
     ocrConfidence: string;
+    faceConfidence: string;
 }
 
 export type ParkingLotSettingKey =
@@ -34,7 +35,8 @@ export type ParkingLotSettingKey =
     | "matchCooldown"
     | "barrierDuration"
     | "maxEditDistance"
-    | "ocrConfidence";
+    | "ocrConfidence"
+    | "faceConfidence";
 
 function emptyParkingLotPage(page = 1): ParkingLotPage {
     return {
@@ -98,6 +100,7 @@ function createForm(parkingLot?: ParkingLot | null): ParkingLotFormState {
         barrierDuration: String(parkingLot?.barrier_duration ?? 0.5),
         maxEditDistance: String(parkingLot?.max_edit_distance ?? 2),
         ocrConfidence: String(parkingLot?.ocr_confidence ?? 0.3),
+        faceConfidence: String(parkingLot?.face_confidence ?? 0.15),
     };
 }
 

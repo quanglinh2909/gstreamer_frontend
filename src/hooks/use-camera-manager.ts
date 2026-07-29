@@ -89,7 +89,9 @@ export function useCameraManager(websocketOrigin = "") {
         setErrorMessage("");
 
         try {
-            const { data } = await cameraApi.getCameras(10, 0);
+            // 1000: lấy hết camera trong một lần (trang này không phân trang) —
+            // đủ dư địa cho mọi triển khai. Để 10 thì DB có 14 camera chỉ hiện 10.
+            const { data } = await cameraApi.getCameras(1000, 0);
             setCameras(asCameraList(data));
             setLastUpdated(new Date());
         } catch (error) {

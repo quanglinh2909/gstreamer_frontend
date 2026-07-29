@@ -19,11 +19,13 @@ export function AiSettingsPanel({
     onAddZone,
     onConfidenceChange,
     onMaxFpsChange,
+    onSaveDetectionsChange,
     onOverlapThresholdChange,
     onCountConfirmChange,
     onReAlertSecondsChange,
     onBarrierDurationChange,
     onMinPlateLengthChange,
+    onDetectModelChange,
     onRemoveShape,
     onReset,
     onSaveRecognition,
@@ -43,11 +45,16 @@ export function AiSettingsPanel({
     onAddZone: () => void;
     onConfidenceChange: (featureId: AiFeatureId, key: AiConfidenceKey, confidence: number) => void;
     onMaxFpsChange: (featureId: AiFeatureId, maxFps: number) => void;
+    onSaveDetectionsChange: (featureId: AiFeatureId, saveDetections: boolean) => void;
     onOverlapThresholdChange: (featureId: AiFeatureId, overlapThreshold: number) => void;
     onCountConfirmChange: (featureId: AiFeatureId, countConfirm: number) => void;
     onReAlertSecondsChange: (featureId: AiFeatureId, reAlertSeconds: number) => void;
     onBarrierDurationChange: (featureId: AiFeatureId, barrierDuration: number) => void;
     onMinPlateLengthChange: (featureId: AiFeatureId, minPlateLength: number) => void;
+    onDetectModelChange: (
+        featureId: AiFeatureId,
+        patch: { modelFile?: string; modelType?: string; classFilter?: string },
+    ) => void;
     onRemoveShape: (shapeId: string) => void;
     onReset: () => void;
     onSaveRecognition: () => void;
@@ -144,12 +151,14 @@ export function AiSettingsPanel({
                         onToggle={onToggleFeature}
                         onConfidenceChange={onConfidenceChange}
                         onMaxFpsChange={onMaxFpsChange}
+                        onSaveDetectionsChange={onSaveDetectionsChange}
                         onOverlapThresholdChange={onOverlapThresholdChange}
                         onTrackerChange={onTrackerChange}
                         onCountConfirmChange={onCountConfirmChange}
                         onReAlertSecondsChange={onReAlertSecondsChange}
                         onBarrierDurationChange={onBarrierDurationChange}
                         onMinPlateLengthChange={onMinPlateLengthChange}
+                        onDetectModelChange={onDetectModelChange}
                     />
                 ) : (
                     <div className="rounded-lg border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">

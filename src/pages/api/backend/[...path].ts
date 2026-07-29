@@ -66,6 +66,12 @@ export default async function handler(
     const contentType = upstream.headers.get("content-type");
     if (contentType) res.setHeader("content-type", contentType);
 
+    // WHEP trả URL của phiên trong header Location; không chuyển tiếp thì
+    // trình duyệt không biết DELETE vào đâu và phiên WebRTC chỉ chết theo
+    // watchdog phía engine (giữ kết nối RTSP thừa tới 30s).
+    const location = upstream.headers.get("location");
+    if (location) res.setHeader("location", location);
+
     const body = Buffer.from(await upstream.arrayBuffer());
     res.status(upstream.status).send(body);
   } catch (err) {

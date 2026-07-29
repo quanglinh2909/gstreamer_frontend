@@ -106,6 +106,7 @@ export function ParkingLotTable({
                                             }
                                         />
                                         <SettingChip label="OCR" value={parkingLot.ocr_confidence.toFixed(2)} />
+                                        <SettingChip label="Mặt" value={parkingLot.face_confidence.toFixed(2)} />
                                     </div>
                                 </td>
                                 <td className="px-5 py-4">

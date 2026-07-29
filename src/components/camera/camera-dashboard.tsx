@@ -12,6 +12,7 @@ import {
     WifiOff,
 } from "lucide-react";
 import type { CameraManager, CameraSocketStatus } from "@/hooks/use-camera-manager";
+import { useLiveViewers } from "@/hooks/use-live-viewers";
 import { CameraCard } from "./camera-card";
 import { featureFilters, statusFilters } from "./camera-constants";
 import { CameraFormModal } from "./camera-form-modal";
@@ -43,6 +44,8 @@ function CameraSocketBadge({ status }: { status: CameraSocketStatus }) {
 }
 
 export function CameraDashboard({ manager }: { manager: CameraManager }) {
+    // Số người đang xem trực tiếp từng camera (toàn hệ thống) — badge trên thẻ.
+    const { liveByCamera } = useLiveViewers(5000);
     return (
         <main className="h-full overflow-y-auto bg-slate-50">
             <div className="mx-auto flex min-h-full max-w-[1600px] flex-col gap-5 px-6 py-5">
@@ -187,6 +190,7 @@ export function CameraDashboard({ manager }: { manager: CameraManager }) {
                                 camera={camera}
                                 onEdit={manager.openEditCamera}
                                 onDelete={manager.openDeleteCamera}
+                                viewers={liveByCamera.get(camera.id) ?? 0}
                             />
                         ))}
                     </section>

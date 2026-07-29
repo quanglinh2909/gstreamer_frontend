@@ -32,6 +32,15 @@ export interface AiFeatureConfig {
     // barrier nằm ở trang "Danh sách biển số trắng" → tab Cấu hình, không
     // phải ở đây.
     minPlateLength?: number;
+    // Vùng cấm: model phát hiện + lọc lớp, chọn được từ giao diện.
+    // modelFile = tên file .rknn; modelType = "yolov8_detect" | "rf_detect";
+    // classFilter = CSV id lớp giữ lại ("" = giữ mọi lớp).
+    modelFile?: string;
+    modelType?: string;
+    classFilter?: string;
+    // Lưu khung phát hiện xuống DB để XEM LẠI vẽ được box/pose và tìm sự
+    // kiện theo vùng vẽ trên hình. Mặc định TẮT (ghi liên tục mỗi khung).
+    saveDetections?: boolean;
 }
 
 export type AiFeatureConfigMap = Record<AiFeatureId, AiFeatureConfig>;

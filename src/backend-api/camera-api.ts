@@ -15,7 +15,12 @@ export const cameraApi = {
         return backendClient.delete(`cameras/${id}`);
     },
     snapshot(id: string) {
-        return backendClient.get(`cameras/${id}/snapshot`, { responseType: "blob" });
+        // Thêm mốc thời gian để MỖI lần lấy là một URL khác nhau — chặn trình
+        // duyệt/proxy trả lại ảnh cũ đã cache (từng dính khung "xanh" của
+        // mppvideodec bám lại trên màn hình dù engine đã trả ảnh mới).
+        return backendClient.get(`cameras/${id}/snapshot?t=${Date.now()}`, {
+            responseType: "blob",
+        });
     },
     getConfigAI(id: string) {
         return backendClient.get(`cameras/${id}/config-ai`);

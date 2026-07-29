@@ -11,12 +11,14 @@ import {
     Plus,
     ScanLine,
     Search,
+    FlaskConical,
     ParkingMeter,
     Settings,
     SquareParking,
     SquarePlay,
     Video,
     ListStart,
+    Clapperboard,
     type LucideIcon,
 } from "lucide-react";
 
@@ -29,7 +31,10 @@ type MenuItem = {
 const mainItems: MenuItem[] = [
     { label: "Dashboard", icon: House, href: "/" },
     { label: "All Cameras", icon: Video, href: "/camera" },
+    { label: "Live View", icon: SquarePlay, href: "/live-view" },
+    { label: "Xem lại", icon: Clapperboard, href: "/recordings" },
     { label: "AI Config", icon: ScanLine, href: "/ai-config" },
+    { label: "Thử model", icon: FlaskConical, href: "/model-test" },
     { label: "Events", icon: History, href: "/events" },
     { label: "Identities", icon: ContactRound, href: "/identities" },
     { label: "Plate Whitelist", icon: ListStart, href: "/plate-white-list" },
@@ -39,7 +44,7 @@ const mainItems: MenuItem[] = [
 ];
 
 const footerItems: MenuItem[] = [
-    { label: "Settings", icon: Settings },
+    { label: "Settings", icon: Settings, href: "/settings" },
     { label: "Account", icon: CircleUserRound },
 ];
 

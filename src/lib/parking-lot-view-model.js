@@ -20,6 +20,7 @@ export const PARKING_LOT_SETTING_LIMITS = [
     { key: "barrierDuration", label: "Độ dài xung barrier", min: 0.1, max: 10 },
     { key: "maxEditDistance", label: "Sai số ký tự cho phép", min: 0, max: 3 },
     { key: "ocrConfidence", label: "Ngưỡng tin cậy OCR", min: 0, max: 1 },
+    { key: "faceConfidence", label: "Độ chính xác khuôn mặt", min: 0, max: 1 },
 ];
 
 export function getParkingLotFormError(form) {
@@ -79,6 +80,7 @@ export function buildParkingLotPayload(form) {
         barrier_duration: asNumber(form?.barrierDuration, 0.5),
         max_edit_distance: asInteger(form?.maxEditDistance, 2),
         ocr_confidence: asNumber(form?.ocrConfidence, 0.3),
+        face_confidence: asNumber(form?.faceConfidence, 0.15),
     };
 }
 
