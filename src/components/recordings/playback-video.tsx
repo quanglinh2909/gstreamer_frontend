@@ -445,9 +445,18 @@ export const PlaybackVideo = forwardRef<
 
         void connect();
 
+        // Tải lại trang / đóng tab không chạy cleanup của effect — xem ghi chú
+        // dài ở webrtc-player.tsx. Phiên xem lại còn tốn hơn phiên xem trực
+        // tiếp: mỗi phiên là một PlaybackSource riêng đang đọc file.
+        const onPageHide = (event: PageTransitionEvent) => {
+            if (!event.persisted) teardown();
+        };
+        window.addEventListener("pagehide", onPageHide);
+
         return () => {
             cancelled = true;
             window.clearTimeout(retryTimer);
+            window.removeEventListener("pagehide", onPageHide);
             teardown();
             if (videoElement) videoElement.srcObject = null;
         };

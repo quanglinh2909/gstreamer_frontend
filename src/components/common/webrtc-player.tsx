@@ -319,9 +319,29 @@ export function WebRtcPlayer({
 
         void connect();
 
+        // TẢI LẠI TRANG / ĐÓNG TAB không chạy cleanup của effect: React chỉ
+        // unmount khi cây component bị gỡ, còn rời trang thì trình duyệt xoá cả
+        // trang. Không có listener này thì DELETE không bao giờ được gửi và
+        // engine phải tự đoán là người xem đã đi — nhanh nhất cũng vài chục
+        // giây, mà trên máy libnice cũ (0.1.18, không có ICE consent freshness)
+        // thì phiên sống mãi và số người xem không bao giờ giảm.
+        //
+        // Dùng "pagehide" chứ không phải "beforeunload": beforeunload không nổ
+        // trên iOS Safari và bị bỏ qua khi trang vào bfcache.
+        //
+        // persisted = true nghĩa là trang chỉ bị treo vào bfcache và có thể
+        // quay lại nguyên trạng — huỷ phiên lúc đó sẽ để lại khung hình chết
+        // khi người dùng bấm Back. Bỏ qua ca đó; nếu trang không bao giờ trở
+        // lại thì watchdog RTCP bên engine dọn hộ sau ~16s.
+        const onPageHide = (event: PageTransitionEvent) => {
+            if (!event.persisted) teardownSession();
+        };
+        window.addEventListener("pagehide", onPageHide);
+
         return () => {
             isCancelled = true;
             window.clearTimeout(retryTimer);
+            window.removeEventListener("pagehide", onPageHide);
             teardownSession();
             if (videoElement) videoElement.srcObject = null;
         };
