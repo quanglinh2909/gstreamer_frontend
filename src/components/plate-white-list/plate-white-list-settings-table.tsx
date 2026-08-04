@@ -1,4 +1,5 @@
-import { Pencil, Trash2 } from "lucide-react";
+import { Link2, Pencil, Trash2 } from "lucide-react";
+import type { PlateGateGroup } from "@/interface/plate-gate-group";
 import type { PlateWhiteListSettings } from "@/interface/plate-white-list-settings";
 
 function Metric({ label, value, hint }: { label: string; value: string; hint?: string }) {
@@ -13,11 +14,13 @@ function Metric({ label, value, hint }: { label: string; value: string; hint?: s
 
 export function PlateWhiteListSettingsTable({
     entries,
+    groups,
     getCameraName,
     onEdit,
     onDelete,
 }: {
     entries: PlateWhiteListSettings[];
+    groups: PlateGateGroup[];
     getCameraName: (cameraId: string) => string;
     onEdit: (entry: PlateWhiteListSettings) => void;
     onDelete: (entry: PlateWhiteListSettings) => void;
@@ -26,6 +29,23 @@ export function PlateWhiteListSettingsTable({
         <div className="space-y-3">
             {entries.map((entry) => {
                 const cameraName = getCameraName(entry.camera_id);
+                const group =
+                    entry.gate_group_id == null
+                        ? null
+                        : groups.find((item) => item.id === entry.gate_group_id) ?? null;
+                // Ai dùng chung đồng hồ chờ với camera này. Hiện thẳng tên chứ
+                // không chỉ hiện tên cụm: khi cổng không mở, câu hỏi đầu tiên
+                // là "camera nào đang giữ đồng hồ" — bắt người dùng đối chiếu
+                // 16 dòng để tự suy ra là bỏ mặc họ.
+                const mates = group
+                    ? entries
+                          .filter(
+                              (other) =>
+                                  other.camera_id !== entry.camera_id &&
+                                  other.gate_group_id === group.id,
+                          )
+                          .map((other) => getCameraName(other.camera_id) || other.camera_id)
+                    : [];
 
                 return (
                     <section
@@ -43,6 +63,17 @@ export function PlateWhiteListSettingsTable({
                                     </span>
                                 </div>
                                 <p className="mt-1 font-mono text-xs text-slate-400">{entry.camera_id}</p>
+                                {group ? (
+                                    <p className="mt-2 inline-flex flex-wrap items-center gap-1.5 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-800">
+                                        <Link2 size={13} aria-hidden="true" />
+                                        <span>
+                                            Cụm <b>{group.name}</b>
+                                            {mates.length > 0
+                                                ? ` — chung đồng hồ chờ với ${mates.join(", ")}`
+                                                : " — chưa có camera nào khác trong cụm"}
+                                        </span>
+                                    </p>
+                                ) : null}
                             </div>
 
                             <div className="flex gap-2">
@@ -68,10 +99,32 @@ export function PlateWhiteListSettingsTable({
                         </div>
 
                         <div className="mt-4 grid grid-cols-2 gap-4 border-t border-slate-100 pt-4 sm:grid-cols-3 lg:grid-cols-5">
+                            {/* Hiện con số ĐANG CÓ HIỆU LỰC, không phải con số
+                                lưu trong dòng này. Thuộc cụm mà vẫn khoe
+                                pre_time riêng thì người dùng đọc ra một mốc
+                                thời gian không hề được dùng. */}
                             <Metric
                                 label="Chờ giữa 2 lần mở"
-                                value={entry.pre_time === 0 ? "Chỉ mở 1 lần" : `${entry.pre_time}s`}
-                                hint={entry.pre_time === 0 ? "mỗi biển 1 lần duy nhất" : undefined}
+                                value={
+                                    group
+                                        ? group.pre_time === 0
+                                            ? "Chỉ mở 1 lần"
+                                            : `${group.pre_time}s`
+                                        : entry.pre_time === 0
+                                          ? "Chỉ mở 1 lần"
+                                          : `${entry.pre_time}s`
+                                }
+                                hint={
+                                    group
+                                        ? `theo cụm ${group.name}${
+                                              entry.pre_time !== group.pre_time
+                                                  ? ` — ${entry.pre_time}s riêng bị bỏ qua`
+                                                  : ""
+                                          }`
+                                        : entry.pre_time === 0
+                                          ? "mỗi biển 1 lần duy nhất"
+                                          : undefined
+                                }
                             />
                             <Metric
                                 label="Sai số ký tự"

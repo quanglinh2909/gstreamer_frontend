@@ -30,34 +30,36 @@ export function PlateWhiteListEntriesTab() {
 
     return (
         <>
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm text-slate-500">
-                    Biển số được phép mở barrier.{" "}
+            <div className="flex items-center justify-between gap-2 sm:gap-4">
+                <p className="min-w-0 text-sm text-slate-500">
+                    <span className="hidden sm:inline">Biển số được phép mở barrier. </span>
                     <span className="font-semibold text-slate-700">
                         Tổng: {manager.plateWhiteListPage.total}
                     </span>
                 </p>
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex shrink-0 flex-wrap items-center gap-2 sm:gap-3">
                     <button
                         type="button"
                         onClick={manager.openCreateEntry}
-                        className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#4369ee] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#3156d4]"
+                        aria-label="Thêm biển số"
+                        className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#4369ee] px-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#3156d4] sm:h-11 sm:px-4"
                     >
                         <Plus size={16} aria-hidden="true" />
-                        Thêm biển số
+                        <span className="hidden sm:inline">Thêm biển số</span>
                     </button>
                     <button
                         type="button"
                         onClick={manager.refreshEntries}
                         disabled={manager.isLoading}
-                        className="inline-flex h-11 items-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 disabled:opacity-60"
+                        aria-label="Làm mới"
+                        className="inline-flex h-9 items-center gap-2 rounded-lg bg-slate-950 px-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 disabled:opacity-60 sm:h-11 sm:px-4"
                     >
                         <RefreshCw
                             size={16}
                             className={cn(manager.isLoading && "animate-spin")}
                             aria-hidden="true"
                         />
-                        Làm mới
+                        <span className="hidden sm:inline">Làm mới</span>
                     </button>
                 </div>
             </div>
@@ -66,7 +68,7 @@ export function PlateWhiteListEntriesTab() {
                 onSubmit={manager.handleSearchSubmit}
                 className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
             >
-                <div className="flex flex-col gap-3 sm:flex-row">
+                <div className="flex flex-row gap-2 sm:gap-3">
                     <div className="relative min-w-0 flex-1">
                         <Search
                             size={17}
@@ -92,10 +94,11 @@ export function PlateWhiteListEntriesTab() {
                     </div>
                     <button
                         type="submit"
-                        className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#4369ee] bg-blue-50 px-5 text-sm font-semibold text-[#4369ee] transition-colors hover:bg-blue-100"
+                        aria-label="Tìm kiếm"
+                        className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-[#4369ee] bg-blue-50 px-3 text-sm font-semibold text-[#4369ee] transition-colors hover:bg-blue-100 sm:px-5"
                     >
                         <Search size={16} aria-hidden="true" />
-                        Tìm kiếm
+                        <span className="hidden sm:inline">Tìm kiếm</span>
                     </button>
                 </div>
                 {manager.submittedPlateNumber ? (

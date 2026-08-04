@@ -11,27 +11,49 @@ import {
 } from "lucide-react";
 import { WebRtcPlayer } from "@/components/common/webrtc-player";
 import type { ICameraResponse } from "@/interface/camera";
+import type { RecordingToggleKind } from "./recording-toggle-modal";
 import { formatCameraDate, getCameraHealth } from "@/lib/camera-view-model";
-import { healthStyles } from "./camera-constants";
+import { healthStyles, recordingModes } from "./camera-constants";
 import { cn } from "./camera-utils";
 import { InfoPill } from "./info-pill";
 import type { CameraHealth } from "./types";
+
+// Giá trị recordingMode là mã kỹ thuật ("always"/"motion") do backend trả về —
+// tra sang đúng nhãn tiếng Việt đang dùng ở ô chọn trong biểu mẫu để hai chỗ
+// không nói hai kiểu.
+function recordingModeLabel(mode: string | null | undefined) {
+    return recordingModes.find((item) => item.value === mode)?.label || "Đang bật";
+}
 
 export function CameraCard({
     camera,
     onEdit,
     onDelete,
+    onToggleRecording,
     viewers = 0,
 }: {
     camera: ICameraResponse;
     onEdit: (camera: ICameraResponse) => void;
     onDelete: (camera: ICameraResponse) => void;
+    /** Mở popup xác nhận cho một trong hai công tắc ghi hình.
+     *  `turnOn` = trạng thái MUỐN chuyển sang. */
+    onToggleRecording: (
+        camera: ICameraResponse,
+        kind: RecordingToggleKind,
+        turnOn: boolean,
+    ) => void;
     // Số người đang xem trực tiếp camera này (toàn hệ thống). 0 = ẩn badge.
     viewers?: number;
 }) {
     const health = getCameraHealth(camera) as CameraHealth;
     const style = healthStyles[health] ?? healthStyles.unknown;
     const isOnline = camera.state === "online";
+    // Đọc y hệt biểu mẫu Sửa camera — xem ghi chú ở khối công tắc bên dưới.
+    const recordingOn = camera.recordingEnabled || camera.recordingMode !== "off";
+    // "Chỉ ghi khi có sự kiện" CHÍNH LÀ chế độ ghi 'motion' của engine — không
+    // phải một cờ thứ hai. Engine chỉ vứt-rồi-giữ-lại đoạn ở chế độ đó, nên
+    // thêm một cờ riêng là tạo ra hai nguồn sự thật cho cùng một hành vi.
+    const eventOnly = camera.recordingMode === "motion";
     const [isLive, setIsLive] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     // Phóng to cả khối preview chứ không riêng thẻ <video>: có vậy nhãn trạng
@@ -124,7 +146,7 @@ export function CameraCard({
                             </span>
                         ) : null}
                         <span className="rounded-full border border-white/10 bg-black/45 px-3 py-1 text-xs font-semibold uppercase text-white backdrop-blur">
-                            {camera.codec || "No codec"}
+                            {camera.codec || "Chưa rõ codec"}
                         </span>
                     </span>
                 </div>
@@ -162,7 +184,7 @@ export function CameraCard({
                     trên nền video luôn khó đọc và che mất một dải ảnh. */}
                 <div className="min-w-0">
                     <h2 className="truncate text-base font-semibold text-slate-900">
-                        {camera.name || "Unnamed camera"}
+                        {camera.name || "Camera chưa đặt tên"}
                     </h2>
                     <p className="truncate font-mono text-xs text-slate-500">{camera.id}</p>
                 </div>
@@ -174,7 +196,7 @@ export function CameraCard({
                         className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950"
                     >
                         <Edit3 size={15} aria-hidden="true" />
-                        Edit
+                        Sửa
                     </button>
                     <button
                         type="button"
@@ -182,27 +204,100 @@ export function CameraCard({
                         className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg border border-rose-200 bg-white text-sm font-semibold text-rose-600 transition-colors hover:bg-rose-50"
                     >
                         <Trash2 size={15} aria-hidden="true" />
-                        Delete
+                        Xóa
                     </button>
                 </div>
 
+                {/* Bỏ ô "Phần cứng": mọi camera đều auto nên nó luôn in ra cùng
+                    một chữ, chiếm chỗ mà không nói thêm gì. */}
                 <div className="grid grid-cols-2 gap-2">
-                    <InfoPill label="Hardware" value={camera.hardware} />
-                    <InfoPill label="Retry" value={String(camera.retryCount ?? 0)} />
+                    <InfoPill label="Số lần thử lại" value={String(camera.retryCount ?? 0)} />
                     <InfoPill
-                        label="Recording"
-                        value={camera.recordingEnabled ? camera.recordingMode || "Enabled" : "Off"}
-                    />
-                    <InfoPill
-                        label="Motion"
-                        value={camera.motionEnabled ? `${camera.motionSensitivity ?? 0}%` : "Off"}
+                        label="Chuyển động"
+                        value={camera.motionEnabled ? `${camera.motionSensitivity ?? 0}%` : "Tắt"}
                     />
                 </div>
+
+                {/* Ghi hình là ô DUY NHẤT bật/tắt được ngay tại đây, nên nó là
+                    công tắc chứ không phải một ô chữ như hai ô trên. Đứng riêng
+                    một hàng: nhét vào lưới 2 cột thì công tắc bị bóp còn ~40px
+                    cạnh nhãn "GHI HÌNH" và rất dễ bấm nhầm.
+
+                    "Đang bật" đọc theo CẢ HAI trường, giống biểu mẫu Sửa camera:
+                    engine tự nâng recordingEnabled lên true khi mode khác "off"
+                    (normalizeRecordingFlag), nên chỉ nhìn recordingEnabled sẽ
+                    hiện "Tắt" cho một camera đang ghi thật. */}
+                <div className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2">
+                    <div className="min-w-0">
+                        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500">
+                            Ghi hình
+                        </p>
+                        <p className="mt-1 truncate text-sm font-semibold text-slate-800">
+                            {recordingOn ? recordingModeLabel(camera.recordingMode) : "Tắt"}
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => onToggleRecording(camera, "power", !recordingOn)}
+                        role="switch"
+                        aria-checked={recordingOn}
+                        aria-label={`Ghi hình cho ${camera.name || "camera"}`}
+                        title={recordingOn ? "Tắt ghi hình" : "Bật ghi hình"}
+                        className={cn(
+                            "relative h-6 w-11 shrink-0 rounded-full transition-colors",
+                            recordingOn ? "bg-emerald-600" : "bg-slate-300",
+                        )}
+                    >
+                        <span
+                            className={cn(
+                                "absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform",
+                                recordingOn ? "translate-x-5" : "translate-x-0",
+                            )}
+                        />
+                    </button>
+                </div>
+
+                {/* Công tắc thứ hai chỉ hiện khi camera ĐANG ghi: "chỉ ghi khi
+                    có sự kiện" trên một camera không ghi gì là một cái núm
+                    không điều khiển cái gì. */}
+                {recordingOn ? (
+                    <div className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2">
+                        <div className="min-w-0">
+                            <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500">
+                                Chỉ ghi khi có sự kiện
+                            </p>
+                            <p className="mt-1 truncate text-sm font-semibold text-slate-800">
+                                {eventOnly
+                                    ? `Ghi trước ${camera.preMotionSeconds ?? 0}s · sau ${camera.postMotionSeconds ?? 0}s`
+                                    : "Tắt — ghi liên tục"}
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => onToggleRecording(camera, "eventOnly", !eventOnly)}
+                            role="switch"
+                            aria-checked={eventOnly}
+                            aria-label={`Chỉ ghi khi có sự kiện cho ${camera.name || "camera"}`}
+                            title={eventOnly ? "Chuyển sang ghi liên tục" : "Chỉ ghi khi có sự kiện"}
+                            className={cn(
+                                "relative h-6 w-11 shrink-0 rounded-full transition-colors",
+                                eventOnly ? "bg-[#4369ee]" : "bg-slate-300",
+                            )}
+                        >
+                            <span
+                                className={cn(
+                                    "absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform",
+                                    eventOnly ? "translate-x-5" : "translate-x-0",
+                                )}
+                            />
+                        </button>
+                    </div>
+                ) : null}
 
                 <div className="flex items-center gap-2 text-xs text-slate-500">
                     <Clock3 size={14} aria-hidden="true" />
                     <span className="truncate">
-                        Updated {formatCameraDate(camera.lastChangedAt)}
+                        Cập nhật {formatCameraDate(camera.lastChangedAt)}
                     </span>
                 </div>
 

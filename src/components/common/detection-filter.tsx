@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ScanLine } from "lucide-react";
-import { ALL_TABS, cn, TYPE_META, type FeedTab } from "@/lib/event-feed-shared";
+import { ALL_TABS, cn, MOTION_META, TYPE_META, type FeedTab } from "@/lib/event-feed-shared";
 
 // Nút "Khung AI" dạng CHIA ĐÔI: nửa trái bật/tắt lớp phủ, nửa phải mở menu
 // chọn LOẠI khung muốn vẽ (mặt / biển số / vùng cấm / khẩu trang). Tách đôi để
@@ -14,6 +14,8 @@ export function DetectionFilter({
     onTypesChange,
     zonesVisible,
     onZonesVisibleChange,
+    motionVisible,
+    onMotionVisibleChange,
     disabled = false,
     disabledHint,
     compact = false,
@@ -24,6 +26,11 @@ export function DetectionFilter({
     onTypesChange: (next: Set<FeedTab>) => void;
     zonesVisible: boolean;
     onZonesVisibleChange: (next: boolean) => void;
+    // Chuyển động là chip RIÊNG, không phải một FeedTab (xem MOTION_META): nó
+    // do engine dò chứ không phải AI, và không có ai_type để lọc chung. Bỏ hai
+    // prop này thì chip không hiện — trang Xem lại chưa dùng tới.
+    motionVisible?: boolean;
+    onMotionVisibleChange?: (next: boolean) => void;
     disabled?: boolean;
     disabledHint?: string;
     compact?: boolean;
@@ -144,7 +151,41 @@ export function DetectionFilter({
                                 </button>
                             );
                         })}
+                        {onMotionVisibleChange ? (
+                            <button
+                                type="button"
+                                onClick={() => onMotionVisibleChange(!motionVisible)}
+                                title="Ô đang động — tím là trong vùng đã vẽ, đỏ là ngoài vùng"
+                                className={cn(
+                                    "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                                    motionVisible
+                                        ? MOTION_META.chip
+                                        : "border-slate-700 text-slate-500 hover:text-slate-300",
+                                )}
+                            >
+                                {MOTION_META.label}
+                            </button>
+                        ) : null}
                     </div>
+                    {onMotionVisibleChange && motionVisible ? (
+                        <div className="mt-2 space-y-1 text-[11px] leading-4 text-slate-500">
+                            <p className="flex items-center gap-1.5">
+                                <span
+                                    className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm"
+                                    style={{ backgroundColor: "#a78bfa66", border: "1px solid #a78bfa" }}
+                                />
+                                Động TRONG vùng đã vẽ
+                            </p>
+                            <p className="flex items-center gap-1.5">
+                                <span
+                                    className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm"
+                                    style={{ backgroundColor: "#f8717155", border: "1px solid #f87171" }}
+                                />
+                                Động ngoài mọi vùng
+                            </p>
+                            <p>Vẽ mọi chuyển động, to nhỏ đều hiện — không đợi đủ ngưỡng sinh sự kiện.</p>
+                        </div>
+                    ) : null}
                     <div className="mt-2.5 flex items-center gap-3 border-t border-slate-800 pt-2 text-[11px]">
                         <button
                             type="button"

@@ -67,14 +67,21 @@ export function IdentityFormModal({
                     </button>
                 </header>
 
-                <div className="grid gap-5 overflow-y-auto p-5 md:grid-cols-[280px_minmax(0,1fr)]">
-                    <div className="relative mx-auto aspect-[5/6] w-full max-w-[260px] overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
-                        <IdentityImage
-                            key={imagePath}
-                            path={imagePath}
-                            alt={form.name || "Ảnh identity"}
-                            sizes="280px"
-                        />
+                <div className="grid gap-4 overflow-y-auto p-4 sm:gap-5 sm:p-5 md:grid-cols-[280px_minmax(0,1fr)]">
+                    {/* Div bọc này KHÔNG thừa: để ô ảnh (aspect-[5/6] + w-full)
+                        làm con trực tiếp của grid thì lúc tính chiều cao hàng,
+                        w-full chưa có giá trị nên hàng bị tính hụt (160px thay vì
+                        312px) và ảnh TRÀN ĐÈ lên các ô nhập bên dưới. Chỉ lộ ra ở
+                        khổ điện thoại vì desktop cột rộng cố định 280px. */}
+                    <div>
+                        <div className="relative mx-auto aspect-[5/6] w-full max-w-[260px] overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
+                            <IdentityImage
+                                key={imagePath}
+                                path={imagePath}
+                                alt={form.name || "Ảnh identity"}
+                                sizes="280px"
+                            />
+                        </div>
                     </div>
 
                     <div className="space-y-5">

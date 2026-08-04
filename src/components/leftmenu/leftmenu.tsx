@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { useEffect } from "react";
 import { useRouter } from "next/router";
+import { useAppMenuStore } from "@/stores/use-app-menu-store";
 import {
     Activity,
     CircleUserRound,
@@ -99,9 +101,40 @@ function MenuButton({ item, active }: { item: MenuItem; active: boolean }) {
 
 export default function Leftmenu() {
     const router = useRouter();
+    const open = useAppMenuStore((state) => state.open);
+    const setOpen = useAppMenuStore((state) => state.setOpen);
+
+    // Đóng menu mỗi khi chuyển trang: trên mobile nó là lớp phủ, để nguyên thì
+    // trang mới mở ra đã bị che sẵn.
+    useEffect(() => {
+        const done = () => setOpen(false);
+        router.events.on("routeChangeComplete", done);
+        return () => router.events.off("routeChangeComplete", done);
+    }, [router.events, setOpen]);
 
     return (
-        <aside className="flex h-svh w-12 shrink-0 flex-col items-center border-r border-slate-200 bg-white">
+        <>
+            {/* Nền mờ — chỉ tồn tại trên mobile, bấm để đóng. */}
+            <div
+                onClick={() => setOpen(false)}
+                aria-hidden="true"
+                className={cn(
+                    "fixed inset-0 z-40 bg-slate-950/50 transition-opacity duration-200 md:hidden",
+                    open ? "opacity-100" : "pointer-events-none opacity-0",
+                )}
+            />
+            {/* Dưới md thanh này KHÔNG chiếm chỗ trong dòng chảy nữa mà trượt
+                từ mép trái vào — trả lại trọn 48px bề ngang cho nội dung. Trên
+                màn 390px thì 48px là 12% màn hình, đủ để một ô video 16:9 cao
+                thêm 27px. z cao hơn ngăn kéo của trang (z-40) để menu ứng dụng
+                luôn nằm trên cùng. */}
+            <aside
+                className={cn(
+                    "fixed inset-y-0 left-0 z-50 flex h-svh w-12 flex-col items-center border-r border-slate-200 bg-white transition-transform duration-200 ease-out",
+                    "md:static md:z-auto md:shrink-0 md:translate-x-0 md:transition-none",
+                    open ? "translate-x-0" : "-translate-x-full",
+                )}
+            >
             <div className="flex h-14 w-full items-center justify-center text-slate-950">
                 <Activity size={24} strokeWidth={2.5} aria-label="App logo" />
             </div>
@@ -123,6 +156,7 @@ export default function Leftmenu() {
                     ))}
                 </div>
             </nav>
-        </aside>
+            </aside>
+        </>
     );
 }

@@ -9,6 +9,7 @@ import {
     LayoutGrid,
     LoaderCircle,
     Maximize2,
+    Menu,
     Minimize2,
     Pause,
     Play,
@@ -17,8 +18,14 @@ import {
     Square,
     Trash2,
     Video,
+    X,
 } from "lucide-react";
 import { SpeedPicker } from "@/components/common/speed-picker";
+import {
+    DrawerBackdrop,
+    DrawerToggle,
+    drawerClass,
+} from "@/components/common/side-drawer";
 import type { ICameraResponse } from "@/interface/camera";
 import type { useCameraManager } from "@/hooks/use-camera-manager";
 import {
@@ -33,12 +40,18 @@ import { DetectionFilter } from "@/components/common/detection-filter";
 import { ALL_TABS, type FeedTab } from "@/lib/event-feed-shared";
 import { EventFeedPanel } from "./event-feed-panel";
 import { useLiveViewers } from "@/hooks/use-live-viewers";
+import { useMotionEventFeed } from "@/hooks/use-motion-event-feed";
+import { useAppMenuStore } from "@/stores/use-app-menu-store";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 
 function cn(...classes: Array<string | false | undefined>) {
     return classes.filter(Boolean).join(" ");
 }
 
 const DEFAULT_SPAN = 6 * 3_600_000;
+// Giữ ô của một KHUNG trên hình bấy nhiêu lâu. Engine bắn 5 khung/giây khi có
+// động; hết động là không còn gói nào nên phải tự hết hạn.
+const MOTION_FRAME_HOLD_MS = 1_200;
 
 function startOfDay(ms: number): number {
     const x = new Date(ms);
@@ -66,20 +79,37 @@ const layouts = [
 export function LiveWall({
     manager,
     eventWsOrigin = "",
+    engineWsOrigin = "",
 }: {
     manager: ReturnType<typeof useCameraManager>;
     // Origin WebSocket của backend PYTHON (/ws) — nơi bắn sự kiện nhận diện.
     // Khác WEBSOCKET_ORIGIN_C (engine) mà camera-manager dùng cho trạng thái.
     eventWsOrigin?: string;
+    // Origin WebSocket của ENGINE C++ (/wsc) — sự kiện CHUYỂN ĐỘNG do engine
+    // phát hiện (motioncells) nên đi đường này, không qua Python.
+    engineWsOrigin?: string;
 }) {
     const { filteredCameras, searchText, setSearchText, isLoading, errorMessage } = manager;
-    // Bảng sự kiện bên phải: mặc định mở để thấy ngay dòng realtime.
+    const toggleAppMenu = useAppMenuStore((state) => state.toggle);
+    const isMobile = useIsMobile();
+    // Bảng sự kiện: mở sẵn ở mọi khổ màn. Trên mobile nó nằm DƯỚI tường video
+    // (chốt 42vh) chứ không phủ lên, nên mở sẵn không che mất hình.
     const [eventsPanelOpen, setEventsPanelOpen] = useState(true);
+    // Danh sách camera bên trái. Trên điện thoại nó là ngăn kéo và mặc định
+    // ĐÓNG — mở sẵn thì che mất tường video, tức là che đúng thứ người ta vào
+    // trang này để xem. Từ md trở lên state này không có tác dụng gì (cột luôn
+    // hiện), xem side-drawer.tsx.
+    const [camListOpen, setCamListOpen] = useState(false);
     // Vẽ khung phát hiện AI đè lên các ô đang xem trực tiếp + lọc theo loại.
     // MẶC ĐỊNH TẮT: lớp phủ che mất hình, ai cần thì tự bật.
     const [showBoxes, setShowBoxes] = useState(false);
     const [boxTypes, setBoxTypes] = useState<Set<FeedTab>>(() => new Set(ALL_TABS));
     const [showZones, setShowZones] = useState(true);
+    // Vẽ ô đã động lên hình. Riêng khỏi `boxTypes` vì chuyển động không phải
+    // một FeedTab — engine tự dò, không đi qua AI. Mặc định BẬT như mọi loại
+    // khung khác (boxTypes khởi tạo bằng ALL_TABS): bật "Khung AI" là thấy đủ
+    // mọi thứ đang được vẽ, không phải đi tìm thêm một công tắc nữa.
+    const [showMotionCells, setShowMotionCells] = useState(true);
 
     const [layoutIndex, setLayoutIndex] = useState(1); // mặc định 4 ô
     const layout = layouts[layoutIndex];
@@ -104,6 +134,19 @@ export function LiveWall({
         slotsRef.current = next;
         setSlotsState(next);
     }, []);
+
+    // Ô đang xem LỚN (chỉ dùng ở khổ điện thoại). Không đổi bố cục tường và
+    // không tháo các ô còn lại khỏi cây — chỉ ẩn chúng bằng CSS. Tháo ra là mỗi
+    // lần phóng to/thu nhỏ lại đàm phán lại chừng ấy phiên WebRTC, đen hình vài
+    // giây và tốn băng thông vô ích.
+    const [maximizedSlot, setMaximizedSlot] = useState<number | null>(null);
+
+    // Ô đang xem lớn mà mất camera (bấm tắt, đổi bố cục, kéo sang ô khác) thì
+    // thoát chế độ xem lớn — nếu không màn hình chỉ còn một ô trống thui thủi
+    // và không có cách nào quay lại lưới.
+    useEffect(() => {
+        if (maximizedSlot !== null && !slots[maximizedSlot]) setMaximizedSlot(null);
+    }, [maximizedSlot, slots]);
 
     const wallRef = useRef<HTMLDivElement>(null);
     const [isWallFullscreen, setIsWallFullscreen] = useState(false);
@@ -343,6 +386,14 @@ export function LiveWall({
     const [seekSignal, setSeekSignal] = useState({ ms: Date.now(), gen: 0 });
     const dateInputRef = useRef<HTMLInputElement>(null);
 
+    // Giữ value của input date khớp ngày đang chọn. Trước đây gán trong onClick
+    // của nút, nhưng dưới md cú chạm đi thẳng vào input nên onClick không chạy —
+    // thiếu chỗ này thì lịch bung ra tô sai ngày.
+    useEffect(() => {
+        if (dateInputRef.current) dateInputRef.current.value = toDateInputValue(dayMs);
+    }, [dayMs]);
+
+
     // Camera THAM CHIẾU: lái timeline (nạp đoạn ghi) và làm chủ con trỏ phát.
     // Ưu tiên ô đang chọn; nếu ô đó trống thì lấy camera hoạt động đầu tiên.
     const referenceId = slots[selectedSlot] ?? slots.find(Boolean) ?? null;
@@ -476,14 +527,79 @@ export function LiveWall({
 
     const playheadMs = mode === "live" ? now : playMs;
 
+    // Ô chuyển động cho lớp phủ: MỘT socket cho cả tường rồi chia theo camera.
+    // Mỗi ô tự mở một cái là 16 kết nối chở đúng cùng một luồng dữ liệu (engine
+    // bắn mọi camera trên một socket, không có tham số lọc).
+    const motionOverlayOn = showBoxes && showMotionCells && mode === "live";
+    // Chỉ đăng ký KHUNG cho camera đang thật sự nằm trên tường: engine bắn 5
+    // gói/giây cho mỗi camera đăng ký, xin cả 16 cái trong khi chỉ xem 4 là
+    // ném đi 60% băng thông.
+    const wallCameraIds = useMemo(
+        () => slots.filter((id): id is string => Boolean(id)),
+        [slots],
+    );
+    const frameCameras = useMemo(
+        () => (motionOverlayOn ? wallCameraIds : []),
+        [motionOverlayOn, wallCameraIds],
+    );
+    const motionOverlayFeed = useMotionEventFeed(
+        engineWsOrigin,
+        motionOverlayOn,
+        null,
+        frameCameras,
+    );
+    const motionByCamera = useMemo(() => {
+        const map = new Map<
+            string,
+            { cells: string; outside: string; gridX: number; gridY: number }
+        >();
+        // Hết hạn theo `now` (đồng hồ 1s ở trên): hết động là engine ngừng gửi,
+        // không tự hết hạn thì ô cuối cùng nằm lì trên hình mãi mãi.
+        for (const frame of Object.values(motionOverlayFeed.frames)) {
+            if (now - frame.atMs > MOTION_FRAME_HOLD_MS) continue;
+            map.set(frame.cameraId, {
+                cells: frame.inside,
+                outside: frame.outside,
+                gridX: frame.gridX,
+                gridY: frame.gridY,
+            });
+        }
+        return map;
+    }, [motionOverlayFeed.frames, now]);
+
+    // Mobile: xếp DỌC — tường video ở trên, bảng sự kiện ở dưới.
     return (
-        <div className="flex h-full min-h-0 bg-slate-950 text-slate-100">
-            <aside className="flex w-72 shrink-0 flex-col border-r border-slate-800 bg-slate-900">
-                <div className="border-b border-slate-800 px-4 py-3">
-                    <h1 className="text-sm font-semibold text-white">Xem trực tiếp</h1>
-                    <p className="mt-0.5 text-xs text-slate-400">
-                        Nháy đúp để xem · Ctrl/Shift+click chọn nhiều · kéo thả vào ô
-                    </p>
+        <div className="flex h-full min-h-0 flex-col bg-slate-950 text-slate-100 md:flex-row">
+            <DrawerBackdrop open={camListOpen} onClose={() => setCamListOpen(false)} />
+            <aside
+                className={cn(
+                    "flex flex-col border-r border-slate-800 bg-slate-900 md:shrink-0",
+                    drawerClass("left", camListOpen, "md:w-72"),
+                )}
+            >
+                <div className="flex items-start gap-2 border-b border-slate-800 px-4 py-3">
+                    <div className="min-w-0 flex-1">
+                        <h1 className="text-sm font-semibold text-white">Xem trực tiếp</h1>
+                        {/* Hai lối thao tác khác hẳn nhau nên hướng dẫn cũng phải
+                            khác — chỉ dẫn "nháy đúp" trên điện thoại là chỉ sai. */}
+                        <p className="mt-0.5 text-xs text-slate-400 md:hidden">
+                            Chạm để mở lên tường · chạm nhiều camera liên tiếp được
+                        </p>
+                        <p className="mt-0.5 hidden text-xs text-slate-400 md:block">
+                            Nháy đúp để xem · Ctrl/Shift+click chọn nhiều · kéo thả vào ô
+                        </p>
+                    </div>
+                    {/* Chỉ có ở khổ điện thoại: trên desktop danh sách nằm cố
+                        định, không có gì để đóng. Nền mờ vẫn đóng được nhưng khi
+                        danh sách dài, chỗ trống để chạm lại nằm ngoài tầm ngón. */}
+                    <button
+                        type="button"
+                        onClick={() => setCamListOpen(false)}
+                        aria-label="Đóng danh sách camera"
+                        className="-mr-1 -mt-1 shrink-0 rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-slate-100 md:hidden"
+                    >
+                        <X size={18} aria-hidden="true" />
+                    </button>
                 </div>
 
                 <div className="border-b border-slate-800 p-3">
@@ -541,12 +657,26 @@ export function LiveWall({
                                 // Chọn kiểu trình quản lý tệp: click chọn một,
                                 // Ctrl+click tick/bỏ tick, Shift+click chọn cả
                                 // dải từ mốc neo tới đây.
-                                onClick={(event) =>
+                                onClick={(event) => {
+                                    // MỘT CHẠM là mở luôn trên điện thoại, và
+                                    // KHÔNG đóng ngăn kéo — mở tường thường là
+                                    // mở vài camera liền tay, đóng lại sau mỗi
+                                    // lần chọn thì phải mở ra lại mấy lượt.
+                                    // Bấm nút quay lại / chạm nền mờ để đóng.
+                                    //
+                                    // Chuột giữ nguyên lối cũ: bấm là TICK chọn
+                                    // (có Ctrl/Shift gom nhóm), nháy đúp mới mở
+                                    // — mỗi lần mở là một phiên WebRTC thật, ở
+                                    // đó bấm nhầm một cái tốn ngay một luồng.
+                                    if (isMobile) {
+                                        assignCamera(camera);
+                                        return;
+                                    }
                                     handlePick(index, {
                                         shift: event.shiftKey,
                                         ctrl: event.ctrlKey || event.metaKey,
-                                    })
-                                }
+                                    });
+                                }}
                                 // Nháy ĐÚP mới mở: nháy đơn quá dễ chạm nhầm
                                 // khi đang rà danh sách, mà mỗi lần mở là một
                                 // phiên WebRTC thật.
@@ -637,6 +767,34 @@ export function LiveWall({
                     })}
                 </div>
 
+                {/* Bộ chọn SỐ Ô — chỉ mobile. Trên thanh công cụ nó bị ẩn vì
+                    chiếm 128px của một thanh 390px; ở đây thì rộng rãi, lại
+                    đứng cạnh danh sách camera nên đúng mạch thao tác "mở mấy
+                    ô, mở camera nào". */}
+                <div className="border-t border-slate-800 px-3 py-2.5 md:hidden">
+                    <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                        Số ô
+                    </span>
+                    <div className="flex gap-1.5">
+                        {layouts.map((item, index) => (
+                            <button
+                                key={item.count}
+                                type="button"
+                                onClick={() => changeLayout(index)}
+                                aria-pressed={index === layoutIndex}
+                                className={cn(
+                                    "h-8 flex-1 rounded-md text-xs font-semibold transition-colors",
+                                    index === layoutIndex
+                                        ? "bg-emerald-500/15 text-emerald-300"
+                                        : "bg-slate-800/60 text-slate-400",
+                                )}
+                            >
+                                {item.count}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
                 <div className="border-t border-slate-800 p-3">
                     <button
                         type="button"
@@ -650,9 +808,39 @@ export function LiveWall({
                 </div>
             </aside>
 
-            <div ref={wallRef} className="flex min-w-0 flex-1 flex-col bg-slate-950">
+            {/* flex-none dưới md: cột này lấy ĐÚNG chiều cao lưới cần (luôn ~56vw
+                bất kể bố cục, vì N cột × N hàng thì tổng chiều cao vẫn bằng một
+                ô toàn màn), phần dư nhường hết cho bảng sự kiện. Để flex-1 thì
+                nó ôm trọn phần chia được và chừa một mảng đen trống giữa tường
+                và bảng sự kiện. min-h-0 giữ lại cho nhánh md:flex-1 — mặc định
+                min-height của flex item là auto, thiếu nó thì lưới đẩy bảng sự
+                kiện ra khỏi màn hình. */}
+            <div ref={wallRef} className="flex min-h-0 min-w-0 flex-none flex-col bg-slate-950 md:flex-1">
+                {/* KHÔNG dùng overflow-x-auto ở đây: overflow tạo VÙNG CẮT, nên
+                    menu thả xuống của nút "Khung AI" bị xén ở mép thanh — nhìn
+                    như bấm không ăn (z-index không cứu được, cắt là cắt). Sau
+                    khi ẩn nút chuông + toàn màn hình ở khổ điện thoại thì thanh
+                    dư chỗ, không cần cuộn nữa. */}
                 <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-800 px-3 py-2">
-                    <div className="flex items-center gap-1">
+                    <div className="flex shrink-0 items-center gap-1">
+                        {/* Menu ỨNG DỤNG — trang này tắt thanh ngang của
+                            MainLayout để khỏi tốn 44px chiều cao, nên nút mở
+                            menu phải nằm ở đây. */}
+                        <DrawerToggle label="Mở menu" onClick={toggleAppMenu}>
+                            <Menu size={16} aria-hidden="true" />
+                        </DrawerToggle>
+                        {/* Danh sách camera */}
+                        <DrawerToggle
+                            label="Danh sách camera"
+                            onClick={() => setCamListOpen(true)}
+                            className="mr-1"
+                        >
+                            <Video size={16} aria-hidden="true" />
+                        </DrawerToggle>
+                        {/* Bộ chọn bố cục: ẩn trên mobile — dưới md tường luôn
+                            xếp MỘT CỘT cuộn dọc nên 4 nút này chỉ còn đổi số ô
+                            trống, không đáng chiếm 128px của một thanh 390px.
+                            Số ô đổi được trong ngăn kéo camera. */}
                         {layouts.map((item, index) => {
                             const Icon = item.icon;
                             return (
@@ -664,7 +852,7 @@ export function LiveWall({
                                     aria-label={item.label}
                                     aria-pressed={index === layoutIndex}
                                     className={cn(
-                                        "inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors",
+                                        "hidden h-8 w-8 items-center justify-center rounded-md transition-colors md:inline-flex",
                                         index === layoutIndex
                                             ? "bg-emerald-500/15 text-emerald-300"
                                             : "text-slate-400 hover:bg-slate-800 hover:text-slate-200",
@@ -676,10 +864,10 @@ export function LiveWall({
                         })}
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex shrink-0 items-center gap-3">
                         {/* Điều khiển XEM LẠI chung — chỉ hiện ở chế độ review */}
                         {mode === "review" ? (
-                            <div className="flex items-center gap-2">
+                            <div className="flex shrink-0 items-center gap-2">
                                 <button
                                     type="button"
                                     onClick={togglePausedAll}
@@ -689,12 +877,26 @@ export function LiveWall({
                                 >
                                     {paused ? <Play size={16} /> : <Pause size={16} />}
                                 </button>
-                                {/* Tốc độ tua, chung cho mọi ô trên tường */}
-                                <SpeedPicker
-                                    value={speed}
-                                    onChange={setSpeed}
-                                    variant="toolbar"
-                                />
+                                {/* Tốc độ tua, chung cho mọi ô trên tường.
+                                    Dưới md nó nằm ở hàng điều khiển ngay dưới
+                                    tường (xem prop `controls` truyền cho
+                                    Timeline) — bảy nấc x1…x64 nhồi vào thanh
+                                    công cụ 390px thì đẩy nút chọn ngày ra
+                                    ngoài. */}
+                                {/* BỌC trong span để ẩn, KHÔNG truyền class
+                                    "hidden" vào SpeedPicker: gốc nó đã có
+                                    `inline-flex`, hai lớp display cùng độ ưu
+                                    tiên thì cái nào đứng sau trong file CSS
+                                    thắng — đo được là `hidden` thua, thanh tốc
+                                    độ vẫn hiện và đẩy nút chọn ngày ra khỏi
+                                    màn hình. */}
+                                <span className="hidden md:inline-flex">
+                                    <SpeedPicker
+                                        value={speed}
+                                        onChange={setSpeed}
+                                        variant="toolbar"
+                                    />
+                                </span>
                                 {/* Chọn ngày */}
                                 <div className="relative">
                                     <button
@@ -718,7 +920,11 @@ export function LiveWall({
                                         type="date"
                                         defaultValue={toDateInputValue(dayMs)}
                                         max={toDateInputValue(Date.now())}
-                                        className="pointer-events-none absolute inset-0 h-full w-full opacity-0 [color-scheme:dark]"
+                                        // pointer-events CHỈ tắt từ md: iOS Safari
+                                        // không bung lịch khi showPicker() gọi vào
+                                        // input đang ẩn, nên dưới md để chính input
+                                        // trong suốt (phủ đúng lên nút) nhận cú chạm.
+                                        className="absolute inset-0 h-full w-full opacity-0 [color-scheme:dark] md:pointer-events-none"
                                         tabIndex={-1}
                                         aria-hidden="true"
                                     />
@@ -727,7 +933,7 @@ export function LiveWall({
                         ) : null}
 
                         {/* Chuyển LIVE ↔ Xem lại cho CẢ tường */}
-                        <div className="flex items-center overflow-hidden rounded-md border border-slate-700">
+                        <div className="flex shrink-0 items-center overflow-hidden rounded-md border border-slate-700">
                             <button
                                 type="button"
                                 onClick={goLiveWall}
@@ -739,7 +945,9 @@ export function LiveWall({
                                 )}
                             >
                                 <Radio size={13} />
-                                LIVE
+                                {/* Chữ chỉ từ sm: hai nhãn này chiếm ~110px,
+                                    bỏ đi thì cả thanh vừa một hàng 390px. */}
+                                <span className="hidden sm:inline">LIVE</span>
                             </button>
                             <button
                                 type="button"
@@ -754,11 +962,12 @@ export function LiveWall({
                                 )}
                             >
                                 <CalendarDays size={13} />
-                                Xem lại
+                                <span className="hidden sm:inline">Xem lại</span>
                             </button>
                         </div>
 
-                        <span className="text-xs text-slate-500">
+                        {/* Ẩn ở khổ hẹp: thông tin phụ, nhường chỗ cho các nút */}
+                        <span className="hidden shrink-0 text-xs text-slate-500 sm:inline">
                             Đang xem {activeCount}/{layout.count}
                         </span>
                         {/* Khung AI chỉ vẽ được ở chế độ trực tiếp: xem lại là
@@ -771,6 +980,8 @@ export function LiveWall({
                             onTypesChange={setBoxTypes}
                             zonesVisible={showZones}
                             onZonesVisibleChange={setShowZones}
+                            motionVisible={showMotionCells}
+                            onMotionVisibleChange={setShowMotionCells}
                         />
                         <button
                             type="button"
@@ -779,7 +990,7 @@ export function LiveWall({
                             aria-label={eventsPanelOpen ? "Ẩn bảng sự kiện" : "Hiện bảng sự kiện"}
                             aria-pressed={eventsPanelOpen}
                             className={cn(
-                                "inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors",
+                                "hidden h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors md:inline-flex",
                                 eventsPanelOpen
                                     ? "bg-emerald-500/15 text-emerald-300"
                                     : "text-slate-400 hover:bg-slate-800 hover:text-slate-200",
@@ -792,7 +1003,7 @@ export function LiveWall({
                             onClick={toggleWallFullscreen}
                             title={isWallFullscreen ? "Thoát toàn màn hình (Esc)" : "Toàn màn hình"}
                             aria-label={isWallFullscreen ? "Thoát toàn màn hình" : "Toàn màn hình"}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200"
+                            className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200 md:inline-flex"
                         >
                             {isWallFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
                         </button>
@@ -802,12 +1013,27 @@ export function LiveWall({
                 {/* gap-px + nền slate-800 tạo đường kẻ mảnh giữa các ô mà không
                     cần border trên từng ô (border sẽ cộng dồn thành viền đôi ở
                     chỗ hai ô kề nhau). */}
+                {/* Mobile GIỮ ĐÚNG số cột của bố cục (4 ô = 2×2), chỉ khác ở
+                    cách tính chiều cao hàng: desktop chia đều chiều cao còn lại,
+                    còn ở đây mỗi hàng cao đúng 16:9 theo bề rộng một ô —
+                    calc(100vw / số-cột * 9/16). Nhờ vậy ô không bao giờ bị bóp
+                    méo hay dẹt lét, và nhiều hàng thì khung tự cuộn dọc.
+
+                    KHÔNG dùng minmax(0, …) cho auto-rows: cận dưới 0 cho phép
+                    hàng co lại, mà khung lưới có chiều cao xác định nên các hàng
+                    chia đều nhau — đo được 4 ô chỉ còn 83px mỗi ô.
+
+                    Số cột/hàng truyền qua biến CSS chứ không qua style nội
+                    tuyến: style nội tuyến luôn thắng class nên md: sẽ vô hiệu,
+                    còn dùng biến thì chỉ nhánh md: đọc tới nó. */}
                 <div
-                    className="grid min-h-0 flex-1 gap-px bg-slate-800"
-                    style={{
-                        gridTemplateColumns: `repeat(${layout.columns}, minmax(0, 1fr))`,
-                        gridTemplateRows: `repeat(${Math.ceil(layout.count / layout.columns)}, minmax(0, 1fr))`,
-                    }}
+                    className="grid min-h-0 flex-1 auto-rows-[calc(100vw/var(--wall-cols)*9/16)] gap-px overflow-y-auto bg-slate-800 [grid-template-columns:repeat(var(--wall-cols),minmax(0,1fr))] md:auto-rows-auto md:overflow-y-hidden md:[grid-template-rows:repeat(var(--wall-rows),minmax(0,1fr))]"
+                    style={
+                        {
+                            "--wall-cols": maximizedSlot !== null ? 1 : layout.columns,
+                            "--wall-rows": Math.ceil(layout.count / layout.columns),
+                        } as React.CSSProperties
+                    }
                 >
                     {slots.map((cameraId, index) => (
                         <LiveTile
@@ -824,6 +1050,11 @@ export function LiveWall({
                             showDetections={showBoxes}
                             detectionTypes={boxTypes}
                             detectionZonesVisible={showZones}
+                            motionCells={
+                                showMotionCells && cameraId
+                                    ? motionByCamera.get(cameraId) ?? null
+                                    : null
+                            }
                             review={
                                 mode === "review" && cameraId
                                     ? {
@@ -846,7 +1077,23 @@ export function LiveWall({
                                     ? `${dragSource.cameraIds.length} camera`
                                     : undefined
                             }
-                            onSelect={() => setSelectedSlot(index)}
+                            className={
+                                maximizedSlot !== null && maximizedSlot !== index
+                                    ? "hidden"
+                                    : undefined
+                            }
+                            onSelect={() => {
+                                setSelectedSlot(index);
+                                // Chạm vào ô có camera là xem LỚN, chạm lần nữa
+                                // thì thu về lưới. Chỉ ở khổ điện thoại: trên
+                                // desktop cú bấm này đang là "chọn ô", thứ mà
+                                // kéo-thả và timeline xem lại đều dựa vào.
+                                if (isMobile && cameraId) {
+                                    setMaximizedSlot((cur) =>
+                                        cur === index ? null : index,
+                                    );
+                                }
+                            }}
                             onClear={() => clearSlot(index)}
                             onDragStartTile={() => setDragSource({ kind: "slot", index })}
                             onDragEndTile={endDrag}
@@ -889,6 +1136,13 @@ export function LiveWall({
                                 isLive={false}
                                 onSeek={handleTimelineSeek}
                                 onWindowChange={(s, e) => setWindow([s, e])}
+                                controls={
+                                    <SpeedPicker
+                                        value={speed}
+                                        onChange={setSpeed}
+                                        variant="toolbar"
+                                    />
+                                }
                             />
                         ) : (
                             <p className="py-6 text-center text-xs text-slate-500">
@@ -903,6 +1157,7 @@ export function LiveWall({
             {eventsPanelOpen ? (
                 <EventFeedPanel
                     origin={eventWsOrigin}
+                    motionOrigin={engineWsOrigin}
                     cameras={filteredCameras}
                     wallCameraIds={slots.filter((id): id is string => Boolean(id))}
                     onClose={() => setEventsPanelOpen(false)}

@@ -1,7 +1,9 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { cameraApi } from "@/backend-api/camera-api";
+import { plateGateGroupApi } from "@/backend-api/plate-gate-group-api";
 import { plateWhiteListSettingsApi } from "@/backend-api/plate-white-list-settings-api";
 import type { ICameraResponse } from "@/interface/camera";
+import type { PlateGateGroup } from "@/interface/plate-gate-group";
 import type {
     PlateWhiteListSettings,
     PlateWhiteListSettingsPayload,
@@ -16,6 +18,8 @@ export interface PlateWhiteListSettingsFormState {
     ocrConfidence: string;
     minPlateLength: string;
     barrierDuration: string;
+    /** "" = không thuộc cụm nào. Chuỗi vì <select> chỉ làm việc với chuỗi. */
+    gateGroupId: string;
 }
 
 // Trùng với default của PlateWhiteListSettingsUpdate ở backend, dùng để điền
@@ -26,6 +30,9 @@ const DEFAULT_FORM: Omit<PlateWhiteListSettingsFormState, "cameraId"> = {
     ocrConfidence: "0.3",
     minPlateLength: "7",
     barrierDuration: "0.5",
+    // Mặc định KHÔNG thuộc cụm nào: gộp cổng vào với cổng ra dùng hai barrier
+    // khác nhau là làm xe vừa vào bị khoá ở cổng ra. Phải do người dùng chọn.
+    gateGroupId: "",
 };
 
 // Khớp với ràng buộc Field(ge=..., le=...) của backend. Chặn ở đây để người
@@ -54,6 +61,7 @@ function createForm(entry?: PlateWhiteListSettings | null): PlateWhiteListSettin
         ocrConfidence: String(entry.ocr_confidence),
         minPlateLength: String(entry.min_plate_length),
         barrierDuration: String(entry.barrier_duration),
+        gateGroupId: entry.gate_group_id == null ? "" : String(entry.gate_group_id),
     };
 }
 
@@ -85,12 +93,15 @@ function buildPayload(form: PlateWhiteListSettingsFormState): PlateWhiteListSett
         ocr_confidence: Number(form.ocrConfidence),
         min_plate_length: Math.round(Number(form.minPlateLength)),
         barrier_duration: Number(form.barrierDuration),
+        gate_group_id: form.gateGroupId ? Number(form.gateGroupId) : null,
     };
 }
 
 export function usePlateWhiteListSettingsManager() {
     const [entries, setEntries] = useState<PlateWhiteListSettings[]>([]);
     const [cameras, setCameras] = useState<ICameraResponse[]>([]);
+    // Danh sách cụm để đổ vào ô chọn và để hiện "đang dùng thời gian của cụm".
+    const [groups, setGroups] = useState<PlateGateGroup[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState("");
     const [refreshKey, setRefreshKey] = useState(0);
@@ -114,10 +125,14 @@ export function usePlateWhiteListSettingsManager() {
                 // Danh sách camera chỉ để hiển thị tên và đổ vào ô chọn khi
                 // thêm mới; nó hỏng thì bảng cấu hình vẫn phải xem được, nên
                 // bắt lỗi riêng thay vì để cả màn hình chết theo.
-                const [settingsResult, camerasResult] = await Promise.allSettled([
+                const [settingsResult, camerasResult, groupsResult] = await Promise.allSettled([
                     plateWhiteListSettingsApi.list(),
                     cameraApi.getCameras(100, 0),
+                    plateGateGroupApi.list(),
                 ]);
+                if (groupsResult.status === "fulfilled" && !isCancelled) {
+                    setGroups(groupsResult.value.data ?? []);
+                }
 
                 if (isCancelled) {
                     return;
@@ -264,6 +279,7 @@ export function usePlateWhiteListSettingsManager() {
         formErrorMessage,
         formMode,
         getCameraName,
+        groups,
         handleFormSubmit,
         isDeleting,
         isFormOpen,

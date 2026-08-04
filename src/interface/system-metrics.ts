@@ -92,6 +92,14 @@ export interface SystemMetricsQuery {
 export interface AiEnabledCount {
     total: number;
     by_type: Record<string, number>;
+    /**
+     * Số CAMERA đang bật phát hiện chuyển động, và trong đó bao nhiêu camera
+     * đang ghi hình theo chuyển động. Để riêng chứ không nằm trong `by_type`:
+     * chuyển động không phải một luồng AI (không model, không NPU) và đếm theo
+     * camera chứ không theo job, nên cộng vào `total` là sai đơn vị.
+     */
+    motion_cameras: number;
+    motion_recording_cameras: number;
 }
 
 /**

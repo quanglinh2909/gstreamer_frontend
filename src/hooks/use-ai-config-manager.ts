@@ -412,6 +412,8 @@ export function useAiConfigManager() {
         );
     };
 
+    // "Chỉ ghi khi có sự kiện" — một hàm patch từng phần cho cả ba trường, vì
+    // chúng luôn được chỉnh cùng nhau trên một khối giao diện.
     const addCanvasPoint = (point: AiPoint) => {
         if (!selectedCameraId) {
             return;

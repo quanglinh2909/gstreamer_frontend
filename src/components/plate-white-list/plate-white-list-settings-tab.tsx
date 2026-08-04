@@ -28,18 +28,20 @@ export function PlateWhiteListSettingsTab() {
 
     return (
         <>
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <p className="max-w-2xl text-sm text-slate-500">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                {/* Đoạn giải thích dài 2 dòng trên điện thoại — giấu đi, phần
+                    "Camera chưa cấu hình sẽ bị bỏ qua" đã thể hiện ngay ở bảng. */}
+                <p className="hidden max-w-2xl text-sm text-slate-500 sm:block">
                     Chỉ camera có trong danh sách này mới mở barrier. Camera chưa cấu hình sẽ bị bỏ
                     qua hoàn toàn, kể cả khi biển số nằm trong danh sách trắng.
                 </p>
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                     <button
                         type="button"
                         onClick={manager.openCreateEntry}
                         disabled={!hasSpareCamera}
                         title={hasSpareCamera ? undefined : "Mọi camera đều đã được cấu hình"}
-                        className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#4369ee] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#3156d4] disabled:opacity-50"
+                        className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#4369ee] px-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#3156d4] disabled:opacity-50 sm:h-11 sm:px-4"
                     >
                         <Plus size={16} aria-hidden="true" />
                         Bật cho camera
@@ -48,14 +50,15 @@ export function PlateWhiteListSettingsTab() {
                         type="button"
                         onClick={manager.refreshEntries}
                         disabled={manager.isLoading}
-                        className="inline-flex h-11 items-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 disabled:opacity-60"
+                        aria-label="Làm mới"
+                        className="inline-flex h-9 items-center gap-2 rounded-lg bg-slate-950 px-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 disabled:opacity-60 sm:h-11 sm:px-4"
                     >
                         <RefreshCw
                             size={16}
                             className={cn(manager.isLoading && "animate-spin")}
                             aria-hidden="true"
                         />
-                        Làm mới
+                        <span className="hidden sm:inline">Làm mới</span>
                     </button>
                 </div>
             </div>
@@ -100,6 +103,7 @@ export function PlateWhiteListSettingsTab() {
             {!manager.isLoading && manager.entries.length > 0 ? (
                 <PlateWhiteListSettingsTable
                     entries={manager.entries}
+                    groups={manager.groups}
                     getCameraName={manager.getCameraName}
                     onEdit={manager.openEditEntry}
                     onDelete={manager.openDeleteEntry}
@@ -111,6 +115,9 @@ export function PlateWhiteListSettingsTab() {
                     mode={manager.formMode}
                     form={manager.form}
                     availableCameras={manager.availableCameras}
+                    entries={manager.entries}
+                    groups={manager.groups}
+                    getCameraName={manager.getCameraName}
                     errorMessage={manager.formErrorMessage}
                     isSaving={manager.isSaving}
                     onClose={manager.closeForm}

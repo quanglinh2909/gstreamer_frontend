@@ -2,16 +2,24 @@ import { cn } from "./camera-utils";
 
 export function ToggleField({
     label,
+    description,
     checked,
     onChange,
 }: {
     label: string;
+    /** Một dòng nói công tắc này thực sự làm gì. */
+    description?: string;
     checked: boolean;
     onChange: (value: boolean) => void;
 }) {
     return (
         <label className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-            <span className="text-sm font-semibold text-slate-800">{label}</span>
+            <span className="min-w-0">
+                <span className="block text-sm font-semibold text-slate-800">{label}</span>
+                {description ? (
+                    <span className="mt-0.5 block text-xs text-slate-500">{description}</span>
+                ) : null}
+            </span>
             <button
                 type="button"
                 aria-pressed={checked}

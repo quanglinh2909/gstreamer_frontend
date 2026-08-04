@@ -1,5 +1,6 @@
 import { AlertTriangle, Plus, RefreshCw, Search, UsersRound, X } from "lucide-react";
 import type { IdentityManager } from "@/hooks/use-identity-manager";
+import { TopBarButton, TopBarCount } from "@/components/layouts/top-bar";
 import { cn } from "./identity-utils";
 import { DeleteIdentityModal } from "./delete-identity-modal";
 import { IdentityCard } from "./identity-card";
@@ -20,11 +21,34 @@ function IdentitySkeleton() {
     );
 }
 
+// Cho thanh trên của MainLayout (chỉ khổ điện thoại).
+export function IdentityTopActions({ manager }: { manager: IdentityManager }) {
+    return (
+        <>
+            <TopBarCount value={manager.identityPage.total} unit="hồ sơ" />
+            <TopBarButton
+                icon={Plus}
+                label="Thêm identity"
+                tone="primary"
+                onClick={manager.openCreateIdentity}
+            />
+            <TopBarButton
+                icon={RefreshCw}
+                label="Làm mới"
+                onClick={manager.refreshIdentities}
+                disabled={manager.isLoading}
+                spinning={manager.isLoading}
+            />
+        </>
+    );
+}
+
 export function IdentityDashboard({ manager }: { manager: IdentityManager }) {
     return (
         <main className="h-full overflow-y-auto bg-slate-50">
-            <div className="mx-auto flex min-h-full max-w-[1600px] flex-col gap-5 px-6 py-5">
-                <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="mx-auto flex min-h-full max-w-[1600px] flex-col gap-3 px-3 py-3 sm:gap-5 sm:px-6 sm:py-5">
+                {/* Tiêu đề + 2 nút đã dồn lên thanh trên ở khổ điện thoại. */}
+                <header className="hidden flex-col gap-4 md:flex lg:flex-row lg:items-center lg:justify-between">
                     <div>
                         <p className="text-sm font-semibold text-[#4369ee]">Recognition Library</p>
                         <h1 className="mt-1 text-2xl font-semibold text-slate-950">Quản lý identity</h1>
@@ -64,9 +88,9 @@ export function IdentityDashboard({ manager }: { manager: IdentityManager }) {
 
                 <form
                     onSubmit={manager.handleSearchSubmit}
-                    className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
+                    className="rounded-xl border border-slate-200 bg-white p-2 shadow-sm sm:p-3"
                 >
-                    <div className="flex flex-col gap-3 sm:flex-row">
+                    <div className="flex flex-row gap-2 sm:gap-3">
                         <div className="relative min-w-0 flex-1">
                             <Search
                                 size={17}
@@ -92,10 +116,11 @@ export function IdentityDashboard({ manager }: { manager: IdentityManager }) {
                         </div>
                         <button
                             type="submit"
-                            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#4369ee] bg-blue-50 px-5 text-sm font-semibold text-[#4369ee] transition-colors hover:bg-blue-100"
+                            aria-label="Tìm kiếm"
+                            className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-[#4369ee] bg-blue-50 px-3 text-sm font-semibold text-[#4369ee] transition-colors hover:bg-blue-100 sm:px-5"
                         >
                             <Search size={16} aria-hidden="true" />
-                            Tìm kiếm
+                            <span className="hidden sm:inline">Tìm kiếm</span>
                         </button>
                     </div>
                     {manager.submittedName ? (
@@ -125,7 +150,7 @@ export function IdentityDashboard({ manager }: { manager: IdentityManager }) {
                 ) : null}
 
                 {manager.isLoading ? (
-                    <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-7">
+                    <section className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-7">
                         {Array.from({ length: 8 }, (_, index) => (
                             <IdentitySkeleton key={index} />
                         ))}
@@ -133,7 +158,7 @@ export function IdentityDashboard({ manager }: { manager: IdentityManager }) {
                 ) : null}
 
                 {!manager.isLoading && !manager.errorMessage && manager.identityPage.items.length === 0 ? (
-                    <section className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white px-6 py-20 text-center">
+                    <section className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white px-4 py-12 text-center sm:px-6 sm:py-20">
                         <div className="flex max-w-sm flex-col items-center gap-3 text-slate-500">
                             <UsersRound size={42} className="text-slate-400" aria-hidden="true" />
                             <p className="text-base font-semibold text-slate-900">Chưa có identity phù hợp</p>
@@ -143,7 +168,7 @@ export function IdentityDashboard({ manager }: { manager: IdentityManager }) {
                 ) : null}
 
                 {!manager.isLoading && manager.identityPage.items.length > 0 ? (
-                    <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-7">
+                    <section className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-7">
                         {manager.identityPage.items.map((identity) => (
                             <IdentityCard
                                 key={identity.id}

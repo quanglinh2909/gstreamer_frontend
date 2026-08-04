@@ -35,8 +35,10 @@ export function IdentityPlatesPanel({ manager }: { manager: IdentityManager }) {
     };
 
     return (
-        <div className="flex h-full min-h-0 flex-col bg-white">
-            <div className="space-y-3 border-b border-slate-200 px-5 py-4">
+        // h-full CHỈ từ lg: dưới đó bảng nằm trong thân modal đang tự cuộn, cột
+        // chứa nó cao theo nội dung nên h-full không có gì để bám.
+        <div className="flex min-h-0 flex-col bg-white lg:h-full">
+            <div className="space-y-3 border-b border-slate-200 px-4 py-3 sm:px-5 sm:py-4">
                 <div className="flex items-center justify-between">
                     <div>
                         <h3 className="inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
@@ -80,7 +82,10 @@ export function IdentityPlatesPanel({ manager }: { manager: IdentityManager }) {
                 ) : null}
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+            {/* Cuộn riêng CHỈ từ lg. Dưới đó "flex-1 + overflow-y-auto" nằm trong
+                một ô cuộn khác làm danh sách bị kẹp lại, vài dòng biển số cuối
+                không cách nào kéo tới được. */}
+            <div className="px-4 py-3 sm:px-5 sm:py-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
                 {isPlatesLoading ? (
                     <div className="flex items-center justify-center gap-2 py-8 text-sm text-slate-500">
                         <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />

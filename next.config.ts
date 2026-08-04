@@ -7,6 +7,7 @@ import type { NextConfig } from "next";
 // header, thêm X-Forwarded-For cho WebRTC).
 const ENGINE_ORIGIN =
   process.env.BACKEND_PROCESS_ORIGIN ?? "http://127.0.0.1:8009";
+const PYTHON_ORIGIN = process.env.BACKEND_ORIGIN ?? "http://127.0.0.1:8010";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -29,6 +30,20 @@ const nextConfig: NextConfig = {
         source: "/rec-playlist/:id",
         destination: `${ENGINE_ORIGIN}/cameras/:id/playback.m3u8`,
       },
+      // WebSocket. Trình duyệt luôn nối về chính host đang phục vụ trang
+      // (websocket-origin.ts), nên nếu KHÔNG có nginx đứng trước thì /ws và
+      // /wsc rơi vào Next và không ai trả lời — yêu cầu Upgrade treo vô hạn ở
+      // readyState=CONNECTING, giao diện đứng mãi ở "Đang kết nối". Rewrite của
+      // Next có chuyển tiếp cả Upgrade (đã đo), nên khai báo ở đây là chạy được
+      // mà không cần custom server.
+      //
+      // Chỗ có nginx thì nginx bắt /ws trước, mấy dòng này không bao giờ tới
+      // lượt — để lại vẫn vô hại.
+      //
+      // Lưu ý ĐƯỜNG DẪN LỆCH NHAU: engine C++ phục vụ /ws/camera-state, còn
+      // frontend gọi /wsc/camera-state để phân biệt với backend Python.
+      { source: "/ws/:path*", destination: `${PYTHON_ORIGIN}/ws/:path*` },
+      { source: "/wsc/:path*", destination: `${ENGINE_ORIGIN}/ws/:path*` },
     ];
   },
 };

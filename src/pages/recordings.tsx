@@ -26,8 +26,12 @@ export default function Recordings({
     const manager = useCameraManager(websocketOrigin);
 
     return (
-        <MainLayout>
-            <RecordingsView cameras={manager.filteredCameras} eventWsOrigin={eventWsOrigin} />
+        <MainLayout mobileBar={false}>
+            <RecordingsView
+                cameras={manager.filteredCameras}
+                eventWsOrigin={eventWsOrigin}
+                engineWsOrigin={websocketOrigin}
+            />
         </MainLayout>
     );
 }

@@ -41,6 +41,10 @@ export interface AiFeatureConfig {
     // Lưu khung phát hiện xuống DB để XEM LẠI vẽ được box/pose và tìm sự
     // kiện theo vùng vẽ trên hình. Mặc định TẮT (ghi liên tục mỗi khung).
     saveDetections?: boolean;
+    // KHÔNG có "chỉ ghi khi có sự kiện" ở đây: đó là cài đặt của CAMERA (trang
+    // Camera → công tắc trên thẻ), dùng chung cho chuyển động lẫn mọi AI. Để
+    // mỗi AI một công tắc riêng thì bật ở đây mà camera đang "Luôn ghi" là nó
+    // im lặng không có tác dụng — đã dính đúng ca đó.
 }
 
 export type AiFeatureConfigMap = Record<AiFeatureId, AiFeatureConfig>;

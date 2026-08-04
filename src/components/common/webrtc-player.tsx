@@ -4,7 +4,7 @@ import { usePointerZoom } from "@/hooks/use-pointer-zoom";
 import { useLiveDetections } from "@/hooks/use-live-detections";
 import type { FeedTab } from "@/lib/event-feed-shared";
 import { ICE_SERVERS } from "@/lib/webrtc-ice";
-import { DetectionOverlay } from "./detection-overlay";
+import { DetectionOverlay, type MotionOverlayCells } from "./detection-overlay";
 
 // Client WHEP (WebRTC-HTTP Egress Protocol) — cùng giao thức MediaMTX dùng.
 //
@@ -53,6 +53,7 @@ export function WebRtcPlayer({
     detectionLabels = true,
     detectionTypes,
     detectionZonesVisible = true,
+    motionCells = null,
 }: {
     cameraId: string;
     className?: string;
@@ -75,6 +76,11 @@ export function WebRtcPlayer({
     detectionTypes?: Set<FeedTab>;
     // Vẽ cả VÙNG giám sát (polygon) của cấu hình AI.
     detectionZonesVisible?: boolean;
+    // Ô chuyển động của sự kiện gần nhất trên camera này. Do component CHA
+    // truyền xuống chứ không tự mở socket: engine bắn MỌI camera trên một
+    // socket duy nhất, mỗi ô tự mở một cái là 16 kết nối chở cùng một luồng dữ
+    // liệu. Tường mở đúng một cái rồi chia cho từng ô.
+    motionCells?: MotionOverlayCells | null;
 }) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const zoom = usePointerZoom<HTMLDivElement>();
@@ -402,6 +408,7 @@ export function WebRtcPlayer({
                     <DetectionOverlay
                         boxes={detectionBoxes}
                         zones={detectionZones}
+                        motion={motionCells}
                         showZones={detectionZonesVisible}
                         videoRef={videoRef}
                         fit={fit}

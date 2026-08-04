@@ -25,7 +25,6 @@ const DEFAULT_MIN_PLATE_LENGTH = 8;
 const DEFAULT_MAX_FPS = 10;
 const DEFAULT_RECOGNITION_MAX_FPS = 5;
 const DEFAULT_TRACKER = /** @type {const} */ ("bytetrack");
-
 function nowIso() {
     return new Date().toISOString();
 }

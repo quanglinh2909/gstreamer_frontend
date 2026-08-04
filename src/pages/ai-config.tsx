@@ -6,7 +6,7 @@ export default function AiConfig() {
     const manager = useAiConfigManager();
 
     return (
-        <MainLayout>
+        <MainLayout title="Cấu hình AI">
             <AiConfigDashboard manager={manager} />
         </MainLayout>
     );

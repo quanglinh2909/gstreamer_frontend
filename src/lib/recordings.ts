@@ -27,6 +27,12 @@ export interface MotionEvent {
     maxScore: number;
     startMs: number;
     endMs: number;
+    // Ô đã động, "hàng:cột" ngăn bằng dấu phẩy, KÈM cỡ lưới lúc ghi nhận. Phải
+    // lưu cả cỡ lưới: đổi lưới trong /ai-config xong thì các sự kiện cũ vẫn
+    // phải vẽ theo lưới của CHÍNH nó, không phải lưới hiện hành.
+    cells: string;
+    gridX: number;
+    gridY: number;
 }
 
 // Postgres trả timestamptz kiểu "2026-07-23 03:39:54.12+00": đổi ' '→'T' và bù
@@ -48,6 +54,13 @@ export function thumbnailUrl(cameraId: string, atMs: number, width = 160): strin
     return `${BASE}/cameras/${encodeURIComponent(cameraId)}/thumbnail?at=${Math.round(
         atMs,
     )}&w=${width}`;
+}
+
+// Ảnh CỦA CHÍNH sự kiện chuyển động — engine chụp một khung lúc sự kiện bắt
+// đầu và lưu cùng hàng. Khác `thumbnailUrl`: cái kia trích lại từ file bản ghi
+// nên cần camera đang bật ghi và đoạn chứa mốc đó phải còn tồn tại.
+export function motionEventImageUrl(eventId: string): string {
+    return `${BASE}/motion-events/${encodeURIComponent(eventId)}/image`;
 }
 
 function withRange(url: string, fromMs: number, toMs: number): string {

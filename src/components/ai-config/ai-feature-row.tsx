@@ -58,14 +58,22 @@ export function AiFeatureRow({
     return (
         <section className="rounded-lg border border-slate-200 bg-white p-3">
             <div className="flex items-start justify-between gap-3">
+                {/* Mô tả nằm sau dấu "?" chứ không in thẳng ra: bảng này có
+                    tới bốn tính năng, mỗi tính năng vài đoạn giải thích thì
+                    người dùng phải cuộn qua cả màn chữ mới tới được cái núm
+                    cần chỉnh. Ai cần thì bấm. */}
                 <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-semibold text-slate-950">{label}</h3>
+                        <HintLabel
+                            label={label}
+                            labelClassName="text-sm font-semibold text-slate-950"
+                            placement="bottom"
+                            hint={description}
+                        />
                         {feature.enabled ? (
                             <CheckCircle2 size={15} className="text-emerald-600" aria-hidden="true" />
                         ) : null}
                     </div>
-                    <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
                 </div>
                 <button
                     type="button"
@@ -126,7 +134,9 @@ export function AiFeatureRow({
 
                         <fieldset>
                             <legend className="mb-2 text-xs font-semibold text-slate-500">Tracker</legend>
-                            <div className="grid grid-cols-3 gap-2">
+                            {/* 1 cột trên điện thoại: chia 3 thì mỗi ô chỉ còn
+                                ~100px, "BoT-SORT" và "OC-SORT" bị cắt mất đuôi. */}
+                            <div className="grid gap-2 sm:grid-cols-3">
                                 {([
                                     { value: "bytetrack", label: "ByteTrack" },
                                     { value: "botsort", label: "BoT-SORT" },
@@ -135,7 +145,10 @@ export function AiFeatureRow({
                                     <label
                                         key={option.value}
                                         className={cn(
-                                            "flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors",
+                                            // px-2/gap-1.5: bảng cài đặt bên phải
+                                            // rộng cố định 360px, chia 3 cột thì
+                                            // px-3 làm "ByteTrack" bị cắt đuôi.
+                                            "flex cursor-pointer items-center gap-1 rounded-lg border px-2 py-2 text-[11px] font-semibold transition-colors sm:text-xs",
                                             tracker === option.value
                                                 ? "border-[#4369ee] bg-blue-50 text-[#3156d4]"
                                                 : "border-slate-200 text-slate-600 hover:bg-slate-50",
@@ -242,24 +255,21 @@ export function AiFeatureRow({
                 {/* Lưu khung phát hiện để XEM LẠI vẽ được box/pose và tìm sự
                     kiện theo vùng vẽ trên hình. Mặc định TẮT vì đây là ghi
                     liên tục theo mỗi khung hình. */}
-                <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-slate-200 p-3">
+                <div className="flex items-start gap-2.5 rounded-lg border border-slate-200 p-3">
                     <input
+                        id={`save-detections-${id}`}
                         type="checkbox"
                         checked={Boolean(feature.saveDetections)}
                         onChange={(event) => onSaveDetectionsChange(id, event.target.checked)}
-                        className="mt-0.5 h-4 w-4 accent-[#4369ee]"
+                        className="mt-0.5 h-4 w-4 cursor-pointer accent-[#4369ee]"
                     />
-                    <span className="min-w-0">
-                        <span className="block text-xs font-semibold text-slate-900">
-                            Lưu khung phát hiện để xem lại
-                        </span>
-                        <span className="mt-0.5 block text-[11px] leading-snug text-slate-500">
-                            Bật thì khi xem lại bản ghi sẽ vẽ được khung/khớp xương, và
-                            vẽ một vùng trên hình để tìm sự kiện đã đi qua vùng đó.
-                            Tốn thêm ~10 MB/ngày cho mỗi AI.
-                        </span>
-                    </span>
-                </label>
+                    <HintLabel
+                        label="Lưu khung phát hiện để xem lại"
+                        labelClassName="cursor-pointer text-xs font-semibold text-slate-900"
+                        className="min-w-0 flex-1"
+                        hint="Bật thì khi xem lại bản ghi sẽ vẽ được khung/khớp xương, và vẽ một vùng trên hình để tìm sự kiện đã đi qua vùng đó. Tốn thêm ~10 MB/ngày cho mỗi AI."
+                    />
+                </div>
                 <div>
                     <div className="mb-2 flex items-center justify-between text-xs font-semibold text-slate-500">
                         <span>Max FPS</span>

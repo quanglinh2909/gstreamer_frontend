@@ -23,28 +23,30 @@ export function DateRangeControl({
     onRefresh: () => void;
 }) {
     return (
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
-            <label className="flex flex-col gap-1">
+        // Điện thoại: hai ô ngày đứng cạnh nhau (grid 2 cột) thay vì mỗi ô một
+        // hàng — datetime-local vẫn vừa ở ~185px.
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-row sm:flex-wrap sm:items-end">
+            <label className="flex min-w-0 flex-col gap-1">
                 <span className="text-xs font-medium text-slate-500">Từ ngày</span>
                 <input
                     type="datetime-local"
                     value={fromInput}
                     onChange={(event) => onFromChange(event.target.value)}
-                    className="h-10 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition-colors focus:border-[#4369ee] focus:bg-white"
+                    className="h-10 w-full min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2 text-sm text-slate-900 outline-none transition-colors focus:border-[#4369ee] focus:bg-white sm:w-auto sm:px-3"
                 />
             </label>
 
-            <label className="flex flex-col gap-1">
+            <label className="flex min-w-0 flex-col gap-1">
                 <span className="text-xs font-medium text-slate-500">Đến ngày</span>
                 <input
                     type="datetime-local"
                     value={toInput}
                     onChange={(event) => onToChange(event.target.value)}
-                    className="h-10 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition-colors focus:border-[#4369ee] focus:bg-white"
+                    className="h-10 w-full min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2 text-sm text-slate-900 outline-none transition-colors focus:border-[#4369ee] focus:bg-white sm:w-auto sm:px-3"
                 />
             </label>
 
-            <div className="flex items-center gap-2">
+            <div className="col-span-2 flex items-center gap-2">
                 <button
                     type="button"
                     onClick={onApply}
@@ -68,7 +70,11 @@ export function DateRangeControl({
                     type="button"
                     onClick={onRefresh}
                     disabled={isLoading}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    // Điện thoại đã có nút làm mới trên thanh trên. Bỏ hẳn
+                    // "inline-flex" khỏi chuỗi thay vì đè bằng "hidden": hai
+                    // tiện ích display cùng độ ưu tiên thì thứ tự trong file CSS
+                    // quyết định, không phải thứ tự mình viết.
+                    className="hidden h-10 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 md:inline-flex text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                     <RefreshCw
                         size={16}

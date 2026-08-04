@@ -1,5 +1,5 @@
 import type { GetServerSideProps, InferGetServerSidePropsType } from "next";
-import { CameraDashboard } from "@/components/camera/camera-dashboard";
+import { CameraDashboard, CameraTopActions, CameraTopStatus } from "@/components/camera/camera-dashboard";
 import { MainLayout } from "@/components/layouts/main-layout";
 import { useCameraManager } from "@/hooks/use-camera-manager";
 
@@ -19,7 +19,11 @@ export default function Camera({
     const manager = useCameraManager(websocketOrigin);
 
     return (
-        <MainLayout>
+        <MainLayout
+            title="Cameras"
+            mobileStatus={<CameraTopStatus manager={manager} />}
+            mobileActions={<CameraTopActions manager={manager} />}
+        >
             <CameraDashboard manager={manager} />
         </MainLayout>
     );

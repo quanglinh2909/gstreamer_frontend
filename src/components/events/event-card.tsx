@@ -37,7 +37,7 @@ function EventThumbnail({
             alt={alt}
             fill
             unoptimized
-            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 25vw"
+            sizes="(max-width: 640px) 50vw, (max-width: 1280px) 33vw, 25vw"
             onError={() => setHasImageError(true)}
             className={cn(
                 preserveDetails
@@ -72,7 +72,7 @@ export function EventCard({
             <div
                 className={cn(
                     "relative overflow-hidden bg-slate-100",
-                    compactCard ? "h-32" : "aspect-[5/6]",
+                    compactCard ? "h-24 sm:h-32" : "aspect-[5/6]",
                 )}
             >
                 <EventThumbnail path={event.image_crop} alt={resultLabel} preserveDetails={preserveDetails} />
@@ -86,30 +86,40 @@ export function EventCard({
                 </span>
             </div>
 
-            <div className={cn(compactCard ? "space-y-2 p-3" : "space-y-3 p-4")}>
+            <div
+                className={cn(
+                    "space-y-1.5 p-2.5",
+                    compactCard ? "sm:space-y-2 sm:p-3" : "sm:space-y-3 sm:p-4",
+                )}
+            >
                 <div>
                     {/* <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#4369ee]">
                         {tab === "plate" ? "Biển số" : "Khuôn mặt"}
                     </p> */}
                     <h2
                         className={cn(
-                            "mt-1 truncate font-semibold text-slate-950",
-                            compactCard ? "text-sm" : "text-base",
+                            "mt-1 truncate text-sm font-semibold text-slate-950",
+                            compactCard ? "" : "sm:text-base",
                         )}
                     >
                         {resultLabel}
                     </h2>
                 </div>
 
-                <div className={cn("flex items-center gap-2 text-slate-600", compactCard ? "text-xs" : "text-sm")}>
-                    <Camera size={15} className="shrink-0 text-slate-400" aria-hidden="true" />
+                <div
+                    className={cn(
+                        "flex items-center gap-1.5 text-xs text-slate-600 sm:gap-2",
+                        compactCard ? "" : "sm:text-sm",
+                    )}
+                >
+                    <Camera size={14} className="shrink-0 text-slate-400" aria-hidden="true" />
                     <span className="truncate">{cameraLabel}</span>
                 </div>
 
                 <p
                     className={cn(
-                        "border-t border-slate-100 font-medium text-slate-500",
-                        compactCard ? "pt-2 text-[11px]" : "pt-3 text-xs",
+                        "border-t border-slate-100 pt-1.5 text-[11px] font-medium text-slate-500",
+                        compactCard ? "sm:pt-2" : "sm:pt-3 sm:text-xs",
                     )}
                 >
                     {formatEventTimestamp(event.timestamp)}

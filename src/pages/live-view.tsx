@@ -27,8 +27,12 @@ export default function LiveView({
     const manager = useCameraManager(websocketOrigin);
 
     return (
-        <MainLayout>
-            <LiveWall manager={manager} eventWsOrigin={eventWsOrigin} />
+        <MainLayout mobileBar={false}>
+            <LiveWall
+                manager={manager}
+                eventWsOrigin={eventWsOrigin}
+                engineWsOrigin={websocketOrigin}
+            />
         </MainLayout>
     );
 }

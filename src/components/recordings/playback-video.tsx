@@ -7,7 +7,10 @@ import {
     useState,
 } from "react";
 import { Maximize2, Minimize2, Pause, Play } from "lucide-react";
-import { DetectionOverlay } from "@/components/common/detection-overlay";
+import {
+    DetectionOverlay,
+    type MotionOverlayCells,
+} from "@/components/common/detection-overlay";
 import { SpeedPicker } from "@/components/common/speed-picker";
 import { usePlaybackDetections } from "@/hooks/use-playback-detections";
 import type { FeedTab } from "@/lib/event-feed-shared";
@@ -82,6 +85,10 @@ export const PlaybackVideo = forwardRef<
         showDetections?: boolean;
         detectionTypes?: Set<FeedTab>;
         detectionLabels?: boolean;
+        // Ô đã động của sự kiện chuyển động CHỨA mốc đang phát. Trang tự tra từ
+        // danh sách sự kiện của ngày (đã tải sẵn cho timeline) rồi truyền xuống
+        // — component này không biết gì về mốc giờ tường.
+        motionCells?: MotionOverlayCells | null;
     }
 >(function PlaybackVideo(
     {
@@ -98,6 +105,7 @@ export const PlaybackVideo = forwardRef<
         showDetections = false,
         detectionTypes,
         detectionLabels = true,
+        motionCells = null,
     },
     ref,
 ) {
@@ -501,6 +509,7 @@ export const PlaybackVideo = forwardRef<
                 lớp phủ dùng fit="contain" để trừ đúng phần viền đen. */}
             {showDetections ? (
                 <DetectionOverlay
+                    motion={motionCells}
                     boxes={playbackBoxes}
                     videoRef={videoRef}
                     fit="contain"

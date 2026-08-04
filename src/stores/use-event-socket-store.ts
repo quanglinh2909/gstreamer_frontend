@@ -27,9 +27,15 @@ interface EventSocketState {
 
 const MAX_BUFFERED_EVENTS = 40;
 const MAX_RECONNECT_DELAY = 5000;
+// Không có ai trả lời yêu cầu Upgrade thì WebSocket nằm mãi ở CONNECTING: không
+// onerror, không onclose, chỉ treo tới khi TCP tự bỏ cuộc (hàng chục giây, có
+// khi lâu hơn). Người dùng thấy "Đang kết nối" đứng im và tưởng máy chủ chậm.
+// Tự bấm giờ rồi đóng để rơi vào nhánh thử lại.
+const CONNECT_TIMEOUT_MS = 8000;
 
 let socket: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let connectTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnectAttempts = 0;
 let currentUrl = "";
 let currentTab: RecognitionEventTab | null = null;
@@ -102,9 +108,17 @@ function clearReconnectTimer() {
     }
 }
 
+function clearConnectTimer() {
+    if (connectTimer) {
+        clearTimeout(connectTimer);
+        connectTimer = null;
+    }
+}
+
 function stopSocket() {
     shouldReconnect = false;
     clearReconnectTimer();
+    clearConnectTimer();
 
     const activeSocket = socket;
     socket = null;
@@ -136,11 +150,26 @@ function openSocket(url: string, tab: RecognitionEventTab, reconnecting: boolean
 
     socket = nextSocket;
 
+    clearConnectTimer();
+    connectTimer = setTimeout(() => {
+        if (socket !== nextSocket || nextSocket.readyState !== WebSocket.CONNECTING) {
+            return;
+        }
+
+        useEventSocketStore.setState({
+            errorMessage: "Máy chủ không phản hồi yêu cầu WebSocket.",
+            status: "error",
+        });
+        // onclose sẽ lo việc hẹn giờ thử lại.
+        nextSocket.close();
+    }, CONNECT_TIMEOUT_MS);
+
     nextSocket.onopen = () => {
         if (socket !== nextSocket) {
             return;
         }
 
+        clearConnectTimer();
         reconnectAttempts = 0;
         useEventSocketStore.setState({ errorMessage: "", status: "connected" });
     };
@@ -187,6 +216,7 @@ function openSocket(url: string, tab: RecognitionEventTab, reconnecting: boolean
         }
 
         socket = null;
+        clearConnectTimer();
         const reconnectTab = currentTab;
 
         if (!shouldReconnect || !currentUrl || !reconnectTab) {

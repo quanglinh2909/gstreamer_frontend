@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Maximize2, Minimize2, MonitorPlay, X } from "lucide-react";
 import { WebRtcPlayer } from "@/components/common/webrtc-player";
+import type { MotionOverlayCells } from "@/components/common/detection-overlay";
 import { PlaybackVideo } from "@/components/recordings/playback-video";
 import type { ICameraResponse } from "@/interface/camera";
 import type { FeedTab } from "@/lib/event-feed-shared";
@@ -30,6 +31,7 @@ export function LiveTile({
     showDetections = false,
     detectionTypes,
     detectionZonesVisible = true,
+    motionCells = null,
     onSelect,
     onClear,
     onDragStartTile,
@@ -37,6 +39,7 @@ export function LiveTile({
     onDragOverTile,
     onDragLeaveTile,
     onDropTile,
+    className,
 }: {
     camera: ICameraResponse | null;
     index: number;
@@ -51,6 +54,9 @@ export function LiveTile({
     showDetections?: boolean;
     detectionTypes?: Set<FeedTab>;
     detectionZonesVisible?: boolean;
+    // Ô chuyển động gần nhất của camera này — tường mở MỘT socket rồi chia cho
+    // từng ô, xem ghi chú ở WebRtcPlayer.
+    motionCells?: MotionOverlayCells | null;
     onSelect: () => void;
     onClear: () => void;
     onDragStartTile: () => void;
@@ -58,6 +64,8 @@ export function LiveTile({
     onDragOverTile: () => void;
     onDragLeaveTile: () => void;
     onDropTile: () => void;
+    // Lớp phụ từ tường (dùng để ẨN các ô khác khi một ô đang xem lớn).
+    className?: string;
 }) {
     const tileRef = useRef<HTMLDivElement>(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
@@ -114,6 +122,7 @@ export function LiveTile({
                 onDropTile();
             }}
             className={cn(
+                className,
                 "group relative overflow-hidden bg-black",
                 // Rê chuột giữ nguyên mũi tên, chỉ đổi sang bàn tay lúc nhấn giữ.
                 camera && !isZoomed ? "active:cursor-grabbing" : undefined,
@@ -166,6 +175,7 @@ export function LiveTile({
                             showDetections={showDetections}
                             detectionTypes={detectionTypes}
                             detectionZonesVisible={detectionZonesVisible}
+                            motionCells={motionCells}
                             // Ô trên tường nhỏ, nhãn chữ che mất hình — chỉ vẽ khung.
                             detectionLabels={false}
                         />

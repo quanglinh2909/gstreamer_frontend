@@ -266,7 +266,13 @@ export function RegionSearchPanel({
     const { rect, hits, loading, error, range } = state;
 
     return (
-        <aside className="flex w-96 shrink-0 flex-col border-l border-slate-800 bg-slate-900">
+        <aside
+            /* Trên điện thoại KHÔNG phủ lên video mà nằm NGAY DƯỚI nó, chiếm
+               hết phần còn lại của màn hình — xem lại camera là vừa nhìn hình
+               vừa lướt sự kiện, che mất một trong hai thì hỏng cả việc. Cột
+               bên phải chỉ quay lại từ md. */
+            className="flex min-h-0 flex-1 flex-col border-t border-slate-800 bg-slate-900 md:w-96 md:flex-none md:shrink-0 md:border-l md:border-t-0"
+        >
             <div className="flex items-center gap-2 border-b border-slate-800 px-4 py-3">
                 <Search size={15} className="text-sky-400" aria-hidden="true" />
                 <h2 className="text-sm font-semibold text-white">Tìm theo vùng</h2>

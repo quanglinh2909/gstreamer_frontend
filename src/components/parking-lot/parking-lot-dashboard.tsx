@@ -10,6 +10,7 @@ import {
     X,
 } from "lucide-react";
 import type { ParkingLotManager } from "@/hooks/use-parking-lot-manager";
+import { TopBarButton, TopBarCount } from "@/components/layouts/top-bar";
 import { DeleteParkingLotModal } from "./delete-parking-lot-modal";
 import { ParkingLotFormModal } from "./parking-lot-form-modal";
 import { ParkingLotPagination } from "./parking-lot-pagination";
@@ -36,11 +37,35 @@ function ParkingLotSkeleton() {
     );
 }
 
+// Cho thanh trên của MainLayout (chỉ khổ điện thoại). Hai nút barrier KHÔNG lên
+// đây: chúng là thao tác chính của trang, để nguyên cỡ lớn có màu ở thân trang
+// thì dễ bấm và khó bấm nhầm hơn.
+export function ParkingLotTopActions({ manager }: { manager: ParkingLotManager }) {
+    return (
+        <>
+            <TopBarCount value={manager.parkingLotPage.total} unit="bãi xe" />
+            <TopBarButton
+                icon={Plus}
+                label="Thêm bãi xe"
+                tone="primary"
+                onClick={manager.openCreateParkingLot}
+            />
+            <TopBarButton
+                icon={RefreshCw}
+                label="Làm mới"
+                onClick={manager.refreshParkingLots}
+                disabled={manager.isLoading}
+                spinning={manager.isLoading}
+            />
+        </>
+    );
+}
+
 export function ParkingLotDashboard({ manager }: { manager: ParkingLotManager }) {
     return (
         <main className="h-full overflow-y-auto bg-slate-50">
-            <div className="mx-auto flex min-h-full max-w-[1400px] flex-col gap-5 px-6 py-5">
-                <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="mx-auto flex min-h-full max-w-[1400px] flex-col gap-3 px-3 py-3 sm:gap-5 sm:px-6 sm:py-5">
+                <header className="hidden flex-col gap-4 md:flex lg:flex-row lg:items-center lg:justify-between">
                     <div>
                         <p className="text-sm font-semibold text-[#4369ee]">Parking</p>
                         <h1 className="mt-1 text-2xl font-semibold text-slate-950">Quản lý bãi xe</h1>
@@ -103,6 +128,37 @@ export function ParkingLotDashboard({ manager }: { manager: ParkingLotManager })
                     </div>
                 </header>
 
+                {/* Bản cho điện thoại của hai nút barrier — thao tác chính của
+                    trang nên vẫn giữ cỡ lớn, chia đôi bề ngang. */}
+                <div className="grid grid-cols-2 gap-2 md:hidden">
+                    <button
+                        type="button"
+                        onClick={() => void manager.controlBarrier("open")}
+                        disabled={manager.barrierAction !== null}
+                        className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 text-sm font-semibold text-white shadow-sm disabled:opacity-60"
+                    >
+                        <ArrowUpFromLine
+                            size={16}
+                            className={cn(manager.barrierAction === "open" && "animate-pulse")}
+                            aria-hidden="true"
+                        />
+                        Mở barrier
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => void manager.controlBarrier("close")}
+                        disabled={manager.barrierAction !== null}
+                        className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-rose-600 px-3 text-sm font-semibold text-white shadow-sm disabled:opacity-60"
+                    >
+                        <ArrowDownToLine
+                            size={16}
+                            className={cn(manager.barrierAction === "close" && "animate-pulse")}
+                            aria-hidden="true"
+                        />
+                        Đóng barrier
+                    </button>
+                </div>
+
                 {manager.barrierMessage ? (
                     <div
                         className={cn(
@@ -125,7 +181,7 @@ export function ParkingLotDashboard({ manager }: { manager: ParkingLotManager })
                     onSubmit={manager.handleSearchSubmit}
                     className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
                 >
-                    <div className="flex flex-col gap-3 sm:flex-row">
+                    <div className="flex flex-row gap-2 sm:gap-3">
                         <div className="relative min-w-0 flex-1">
                             <Search
                                 size={17}
@@ -151,10 +207,11 @@ export function ParkingLotDashboard({ manager }: { manager: ParkingLotManager })
                         </div>
                         <button
                             type="submit"
-                            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#4369ee] bg-blue-50 px-5 text-sm font-semibold text-[#4369ee] transition-colors hover:bg-blue-100"
+                            aria-label="Tìm kiếm"
+                            className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-[#4369ee] bg-blue-50 px-3 text-sm font-semibold text-[#4369ee] transition-colors hover:bg-blue-100 sm:px-5"
                         >
                             <Search size={16} aria-hidden="true" />
-                            Tìm kiếm
+                            <span className="hidden sm:inline">Tìm kiếm</span>
                         </button>
                     </div>
                     {manager.submittedName ? (

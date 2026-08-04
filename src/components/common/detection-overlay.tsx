@@ -86,9 +86,41 @@ function toPoints(kps: number[]): Array<{ x: number; y: number } | null> {
     return out;
 }
 
+// Ô chuyển động của sự kiện GẦN NHẤT trên camera này. Không đi qua AI: engine
+// tự dò bằng motioncells rồi bắn qua /ws/motion-events, nên không có aiType,
+// không có độ tin cậy, và chỉ về khi sự kiện ĐÃ KẾT THÚC — tức luôn trễ vài
+// giây so với hình đang chạy. Vẽ mờ hơn khung AI để không ai nhầm là realtime.
+export type MotionOverlayCells = {
+    /** Ô đang động NẰM TRONG một vùng đã vẽ. */
+    cells: string;
+    /** Ô đang động nằm NGOÀI mọi vùng — vẽ đỏ. Bỏ trống khi vẽ lại sự kiện cũ. */
+    outside?: string;
+    gridX: number;
+    gridY: number;
+};
+
+const MOTION_COLOR = "#a78bfa"; // tím — cùng màu chip "Chuyển động"
+// Đỏ cho chuyển động NGOÀI vùng: vẫn hiện để biết chỗ đó có động, nhưng khác
+// màu để không nhầm với chỗ thật sự đang được canh.
+const MOTION_OUTSIDE_COLOR = "#f87171";
+
+function motionCellList(raw: string, gridX: number, gridY: number): Array<[number, number]> {
+    const out: Array<[number, number]> = [];
+    for (const part of String(raw || "").split(",")) {
+        const [r, c] = part.trim().split(":");
+        const row = Number(r);
+        const col = Number(c);
+        if (!Number.isInteger(row) || !Number.isInteger(col)) continue;
+        if (row < 0 || col < 0 || row >= gridY || col >= gridX) continue;
+        out.push([row, col]);
+    }
+    return out;
+}
+
 export function DetectionOverlay({
     boxes,
     zones = [],
+    motion,
     videoRef,
     fit,
     transform,
@@ -98,6 +130,7 @@ export function DetectionOverlay({
     types,
 }: {
     boxes: OverlayBox[];
+    motion?: MotionOverlayCells | null;
     // Vùng giám sát (polygon) của cấu hình AI — chỉ những job có cấu hình vùng
     // mới có; job chạy toàn khung thì rỗng.
     zones?: OverlayZone[];
@@ -177,7 +210,21 @@ export function DetectionOverlay({
     const hasPose = visible.some((b) => b.kps && b.kps.length >= 3);
     const hasMask = visible.some((b) => !!b.mask);
 
-    if (!rect || (visible.length === 0 && visibleZones.length === 0)) {
+    const motionOk = Boolean(motion && motion.gridX > 0 && motion.gridY > 0);
+    const motionCells = motionOk
+        ? motionCellList(motion!.cells, motion!.gridX, motion!.gridY)
+        : [];
+    const motionOutside = motionOk
+        ? motionCellList(motion!.outside ?? "", motion!.gridX, motion!.gridY)
+        : [];
+
+    if (
+        !rect ||
+        (visible.length === 0 &&
+            visibleZones.length === 0 &&
+            motionCells.length === 0 &&
+            motionOutside.length === 0)
+    ) {
         // Vẫn phải render phần tử để ResizeObserver có chỗ đo.
         return <div ref={hostRef} className="pointer-events-none absolute inset-0" />;
     }
@@ -304,6 +351,38 @@ export function DetectionOverlay({
                         })}
                     </svg>
                 ) : null}
+
+                {/* Ô CHUYỂN ĐỘNG — vẽ dưới cùng, đè lên hình nhưng nằm dưới
+                    khung AI. Toạ độ là tỉ lệ của CẢ khung nên dùng % thẳng.
+                    Ngoài vùng vẽ TRƯỚC để ô trong vùng nổi lên trên nếu trùng. */}
+                {motionOutside.map(([row, col]) => (
+                    <div
+                        key={`mx-${row}:${col}`}
+                        className="absolute"
+                        style={{
+                            left: `${(col / motion!.gridX) * 100}%`,
+                            top: `${(row / motion!.gridY) * 100}%`,
+                            width: `${(1 / motion!.gridX) * 100}%`,
+                            height: `${(1 / motion!.gridY) * 100}%`,
+                            backgroundColor: `${MOTION_OUTSIDE_COLOR}33`,
+                            border: `1px solid ${MOTION_OUTSIDE_COLOR}a0`,
+                        }}
+                    />
+                ))}
+                {motionCells.map(([row, col]) => (
+                    <div
+                        key={`mo-${row}:${col}`}
+                        className="absolute"
+                        style={{
+                            left: `${(col / motion!.gridX) * 100}%`,
+                            top: `${(row / motion!.gridY) * 100}%`,
+                            width: `${(1 / motion!.gridX) * 100}%`,
+                            height: `${(1 / motion!.gridY) * 100}%`,
+                            backgroundColor: `${MOTION_COLOR}40`,
+                            border: `1px solid ${MOTION_COLOR}b0`,
+                        }}
+                    />
+                ))}
 
                 {visible.map((b, i) => {
                     const color = colorOf(b);

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { ZoomIn, ZoomOut } from "lucide-react";
 import type { MotionEvent, RecordingSegment } from "@/lib/recordings";
 import { thumbnailUrl } from "@/lib/recordings";
 import type { FeedTab } from "@/lib/event-feed-shared";
@@ -34,9 +35,13 @@ const STEPS = [
     3_600_000, 2 * 3_600_000, 3 * 3_600_000, 6 * 3_600_000, 12 * 3_600_000,
     24 * 3_600_000,
 ];
-// Số nhãn tối đa trên thước. Càng lớn thước càng chi tiết (bước nhãn nhỏ lại).
-// 22 nhãn trên thanh ~1500px ≈ cách nhau 68px — vẫn đọc thoải mái với "HH:MM".
-const MAX_LABELS = 22;
+// Bề ngang tối thiểu cho một nhãn "HH:MM" trên thước. Số nhãn được tính từ bề
+// rộng THẬT của thanh chứ không phải hằng số: trước đây cố định 22 nhãn — vừa
+// đẹp trên thanh 1500px của desktop, nhưng trên điện thoại thanh chỉ còn ~340px
+// nên 22 nhãn nằm đè lên nhau thành một vệt số không đọc được.
+const LABEL_MIN_PX = 68;
+// Nửa bề rộng bong bóng giờ ("LIVE 16:26:21" ~90px) — dùng để kẹp nó trong khung.
+const BUBBLE_HALF_PX = 48;
 export const MIN_SPAN = 2 * 60_000; // phóng sâu nhất: 2 phút toàn khung
 export const MAX_SPAN = 7 * 24 * 3_600_000; // rộng nhất: 7 ngày
 
@@ -74,6 +79,8 @@ export function Timeline({
     isLive,
     onSeek,
     onWindowChange,
+    controls,
+    showMobileZoom = true,
 }: {
     windowStart: number;
     windowEnd: number;
@@ -88,8 +95,26 @@ export function Timeline({
     isLive: boolean;
     onSeek: (ms: number) => void;
     onWindowChange: (start: number, end: number) => void;
+    // Cụm nút của TRANG (LIVE, chọn ngày) nhét vào hàng điều khiển mobile —
+    // gộp chung một hàng thay vì để chúng ăn thêm một dòng riêng bên dưới.
+    controls?: ReactNode;
+    // false = trang tự dựng nút phóng ở chỗ khác (Xem lại đặt nổi lên video để
+    // khỏi tốn một hàng riêng). Mặc định true cho tường Live View.
+    showMobileZoom?: boolean;
 }) {
     const trackRef = useRef<HTMLDivElement>(null);
+    // Bề rộng thật của thanh, để tính mật độ nhãn. Khởi tạo 1200 (cỡ desktop)
+    // cho lần render đầu trước khi đo được — ResizeObserver sửa ngay sau đó.
+    const [trackWidth, setTrackWidth] = useState(1200);
+    useEffect(() => {
+        const el = trackRef.current;
+        if (!el) return;
+        const observer = new ResizeObserver(([entry]) => {
+            setTrackWidth(entry.contentRect.width);
+        });
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, []);
     const span = Math.max(MIN_SPAN, windowEnd - windowStart);
     // Con trỏ: rê là MŨI TÊN thường, chỉ khi nhấn giữ kéo mới thành bàn tay nắm.
     const [isDragging, setIsDragging] = useState(false);
@@ -209,6 +234,19 @@ export function Timeline({
         return () => el.removeEventListener("wheel", onWheel);
     }, [windowStart, span, clampWindow, onWindowChange]);
 
+    // Phóng bằng NÚT — điện thoại không có con lăn, mà không đổi được độ rộng
+    // khung thì timeline chỉ còn xem được đúng 6 giờ mặc định. Neo vào GIỮA
+    // khung thay vì vào con trỏ (chạm không có vị trí con trỏ thường trực).
+    const zoomBy = useCallback(
+        (factor: number) => {
+            const center = windowStart + span / 2;
+            const newSpan = Math.min(MAX_SPAN, Math.max(MIN_SPAN, span * factor));
+            const [s, en] = clampWindow(center - newSpan / 2, center + newSpan / 2);
+            onWindowChange(s, en);
+        },
+        [windowStart, span, clampWindow, onWindowChange],
+    );
+
     const onPointerDown = (e: React.PointerEvent) => {
         (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
         drag.current = { startX: e.clientX, startWindow: [windowStart, windowEnd], moved: false };
@@ -241,8 +279,9 @@ export function Timeline({
     };
     const onPointerLeave = () => setHoverMs(null);
 
-    // Thước: bước nhãn cho ~≤MAX_LABELS nhãn, vạch nhỏ mịn hơn 4 lần.
-    const majorStep = STEPS.find((s) => span / s <= MAX_LABELS) ?? STEPS[STEPS.length - 1];
+    // Thước: bước nhãn sao cho hai nhãn cạnh nhau cách >= LABEL_MIN_PX.
+    const maxLabels = Math.max(3, Math.floor(trackWidth / LABEL_MIN_PX));
+    const majorStep = STEPS.find((s) => span / s <= maxLabels) ?? STEPS[STEPS.length - 1];
     // Vạch nhỏ không giới hạn sàn 1 phút nữa (chặn ở 1s) để phóng sâu vẫn mịn.
     const minorStep = Math.max(1_000, Math.round(majorStep / 4));
     const majorIsDay = majorStep >= 24 * 3_600_000;
@@ -285,12 +324,43 @@ export function Timeline({
     const playheadVisible =
         playheadMs != null && playheadMs >= windowStart && playheadMs <= windowEnd;
     // Bong bóng giờ kẹp vào trong mép để không tràn ra ngoài khung.
+    //
+    // Kẹp theo PIXEL chứ không theo phần trăm cố định: bong bóng "LIVE 16:26:21"
+    // rộng ~90px, tức nửa của nó là 45px. Trên thanh 1500px thì 45px chỉ là 3%
+    // nên mốc 4%/96% cũ vừa đủ; trên thanh 340px của điện thoại thì 45px đã là
+    // 13% — kẹp ở 96% vẫn thò hẳn nửa bong bóng ra ngoài màn hình.
+    const bubbleMarginPct = trackWidth > 0 ? (BUBBLE_HALF_PX / trackWidth) * 100 : 4;
     const bubblePct = playheadVisible
-        ? Math.min(96, Math.max(4, pct(playheadMs as number)))
+        ? Math.min(100 - bubbleMarginPct, Math.max(bubbleMarginPct, pct(playheadMs as number)))
         : 0;
 
     return (
-        <div className="select-none">
+        <div className="relative select-none">
+            {/* Hàng điều khiển — CHỈ mobile. Trên desktop con lăn lo việc phóng,
+                còn LIVE/chọn ngày nằm ở cột bên phải timeline, nên hàng này
+                không có gì để hiện. Trang nào tự đặt nút phóng chỗ khác thì tắt
+                bằng showMobileZoom. */}
+            {showMobileZoom || controls ? (
+                <div className="mb-2 flex items-center gap-1 md:hidden">
+                    <button
+                        type="button"
+                        onClick={() => zoomBy(1 / 2)}
+                        aria-label="Phóng to khung thời gian"
+                        className="flex h-7 w-8 items-center justify-center rounded border border-slate-600 text-slate-200"
+                    >
+                        <ZoomIn size={14} aria-hidden="true" />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => zoomBy(2)}
+                        aria-label="Thu nhỏ khung thời gian"
+                        className="flex h-7 w-8 items-center justify-center rounded border border-slate-600 text-slate-200"
+                    >
+                        <ZoomOut size={14} aria-hidden="true" />
+                    </button>
+                    {controls ? <div className="ml-auto flex items-center gap-2">{controls}</div> : null}
+                </div>
+            ) : null}
             <div
                 ref={trackRef}
                 onPointerDown={onPointerDown}
@@ -302,7 +372,7 @@ export function Timeline({
                 {/* Dải NGÀY (tầng trên). overflow-hidden + bỏ nhãn quá sát mép
                     phải: nhãn ngày ở mốc nửa đêm cuối (pct ~100%) tràn ra ngoài
                     thanh, đè lên cụm nút LIVE/chọn ngày bên phải. */}
-                <div className="relative h-5 overflow-hidden border-b border-slate-700/60 text-[11px] text-slate-300">
+                <div className="relative hidden h-5 overflow-hidden border-b border-slate-700/60 text-[11px] text-slate-300 md:block">
                     {dayMarks.map((t) => {
                         const labelAt = Math.max(t, windowStart);
                         const labelPct = Math.max(0, pct(labelAt));
@@ -326,7 +396,7 @@ export function Timeline({
                 </div>
 
                 {/* Thước GIỜ (tầng dưới) + vạch */}
-                <div className="relative h-6 text-[10px] text-slate-400">
+                <div className="relative h-5 text-[10px] text-slate-400 md:h-6">
                     {minorTicks.map((t) => (
                         <div
                             key={"mi" + t}
@@ -341,7 +411,7 @@ export function Timeline({
                                 style={{ left: `${pct(t)}%` }}
                             />
                             <div
-                                className="absolute top-2.5 -translate-x-1/2 whitespace-nowrap"
+                                className="absolute top-2 -translate-x-1/2 whitespace-nowrap md:top-2.5"
                                 style={{ left: `${pct(t)}%` }}
                             >
                                 {majorIsDay ? dmy(t) : labelWithSeconds ? hms(t) : hm(t)}
@@ -352,7 +422,7 @@ export function Timeline({
 
                 {/* Dải GHI HÌNH (xanh lá) */}
                 {/* Không bo góc mép phải: vạch live nằm sát mép, bo góc tạo khe hở nhìn như thiếu dữ liệu. */}
-                <div className="relative mt-1 h-8 overflow-hidden rounded-l-sm bg-slate-800/70">
+                <div className="relative mt-0.5 h-6 overflow-hidden rounded-l-sm bg-slate-800/70 md:mt-1 md:h-8">
                     {majorTicks.map((t) => (
                         <div
                             key={"g" + t}
@@ -403,8 +473,13 @@ export function Timeline({
 
                 {/* Làn SỰ KIỆN AI. Sự kiện là một thời ĐIỂM chứ không phải một
                     khoảng, nên vẽ vạch mảnh; bấm vào vẫn tua như mọi chỗ khác
-                    trên thanh vì cả khối này nằm trong vùng bắt chuột. */}
-                <div className="relative mt-0.5 h-2.5 overflow-hidden rounded-l-sm bg-slate-800/40">
+                    trên thanh vì cả khối này nằm trong vùng bắt chuột.
+
+                    ẨN dưới md: trên điện thoại thanh timeline chỉ rộng ~340px
+                    nên các vạch dồn thành một vệt không đọc ra mốc nào, mà danh
+                    sách sự kiện ngay bên dưới đã liệt kê đủ kèm giờ và ảnh —
+                    bấm vào đó tua chính xác hơn nhiều so với chấm vào vạch. */}
+                <div className="relative mt-0.5 hidden h-2.5 overflow-hidden rounded-l-sm bg-slate-800/40 md:block">
                     {aiEvents.map((ev) =>
                         ev.ms >= windowStart && ev.ms <= windowEnd ? (
                             <div
@@ -424,7 +499,7 @@ export function Timeline({
                 {hoverMs != null && !isDragging ? (
                     <>
                         <div
-                            className="pointer-events-none absolute bottom-0 top-5 z-10 w-px bg-slate-300/70"
+                            className="pointer-events-none absolute bottom-0 top-0 z-10 w-px bg-slate-300/70 md:top-5"
                             style={{ left: `${pct(hoverMs)}%` }}
                         />
                         {/* Ảnh xem trước nổi phía trên thanh; nếu có ảnh thì chính
@@ -439,7 +514,7 @@ export function Timeline({
                                 style={{
                                     left: `${Math.min(89, Math.max(11, pct(hoverMs)))}%`,
                                     bottom: "calc(100% + 6px)",
-                                    width: 288,
+                                    width: "min(288px, 70vw)",
                                 }}
                             >
                                 <div className="overflow-hidden rounded-md border border-slate-500 bg-slate-900 shadow-xl">
@@ -471,11 +546,22 @@ export function Timeline({
                             }
                             style={{ left: `${pct(playheadMs as number)}%` }}
                         />
+                        {/* Ở chế độ LIVE trên mobile thì BỎ bong bóng giờ: nó
+                            nổi lên trên thanh, đúng chỗ hàng nút vừa dọn lên,
+                            nên hai thứ đè nhau. Mất mát bằng không — giờ hiện
+                            tại đã có sẵn trên OSD của camera, mà vạch live màu
+                            xanh vẫn còn đó để biết đang ở đâu. Chế độ xem lại
+                            vẫn giữ (lúc đó bong bóng là thông tin duy nhất cho
+                            biết đang phát ở mốc nào). */}
                         <div
                             className={
-                                "pointer-events-none absolute -top-6 z-10 -translate-x-1/2 whitespace-nowrap rounded px-2 py-0.5 font-mono text-xs text-white ring-1 " +
+                                // top-0 dưới md (nằm ĐÈ lên thước giờ) thay vì
+                                // nổi lên trên thanh: phía trên giờ là hàng
+                                // điều khiển (nút phóng, thanh tốc độ) nên bong
+                                // bóng nổi lên là che mất các nấc tua.
+                                "pointer-events-none absolute top-0 z-10 -translate-x-1/2 whitespace-nowrap rounded px-2 py-0.5 font-mono text-xs text-white ring-1 md:-top-6 " +
                                 (isLive
-                                    ? "bg-emerald-600 ring-emerald-400"
+                                    ? "hidden bg-emerald-600 ring-emerald-400 md:block"
                                     : "bg-slate-900 ring-slate-600")
                             }
                             style={{ left: `${bubblePct}%` }}
@@ -486,36 +572,7 @@ export function Timeline({
                 ) : null}
             </div>
 
-            {/* Chú thích */}
-            <div className="mt-2 flex items-center gap-4 text-[11px] text-slate-400">
-                <Legend className="bg-green-500" label="Đã ghi" />
-                <Legend className="bg-emerald-400" label="Đang ghi" />
-                <Legend className="bg-amber-400" label="Chuyển động" />
-                {/* Bốn màu sự kiện AI gộp một mục: liệt kê riêng từng loại thì
-                    chú thích dài hơn cả thanh, mà màu đã trùng với badge ở
-                    bảng sự kiện nên nhìn là nhận ra. */}
-                <span className="flex items-center gap-1.5">
-                    <span className="inline-flex overflow-hidden rounded-sm">
-                        <span className="inline-block h-2.5 w-1" style={{ backgroundColor: AI_TICK_COLOR.face }} />
-                        <span className="inline-block h-2.5 w-1" style={{ backgroundColor: AI_TICK_COLOR.plate }} />
-                        <span className="inline-block h-2.5 w-1" style={{ backgroundColor: AI_TICK_COLOR.restricted }} />
-                        <span className="inline-block h-2.5 w-1" style={{ backgroundColor: AI_TICK_COLOR.mask }} />
-                    </span>
-                    Sự kiện AI
-                </span>
-                <span className="ml-auto text-slate-500">
-                    Lăn để phóng · giữ kéo để trượt · bấm để tua
-                </span>
-            </div>
         </div>
     );
 }
 
-function Legend({ className, label }: { className: string; label: string }) {
-    return (
-        <span className="flex items-center gap-1.5">
-            <span className={`inline-block h-2.5 w-4 rounded-sm ${className}`} />
-            {label}
-        </span>
-    );
-}

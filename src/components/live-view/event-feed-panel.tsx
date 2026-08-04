@@ -14,19 +14,27 @@ import {
     cn,
     feedLabel,
     getBox,
+    MOTION_META,
     TYPE_META,
     type BoxRect,
     type FeedTab,
 } from "@/lib/event-feed-shared";
 import { useLiveEventFeed } from "@/hooks/use-live-event-feed";
+import { useMotionEventFeed } from "@/hooks/use-motion-event-feed";
+import { MotionFeedRow } from "@/components/common/motion-feed-row";
+import { parseMotionCells } from "@/components/common/motion-cells-overlay";
 
 export function EventFeedPanel({
     origin,
+    motionOrigin,
     cameras,
     wallCameraIds,
     onClose,
 }: {
     origin: string;
+    // Origin WebSocket của ENGINE (/wsc) — chuyển động do engine bắn, KHÁC
+    // `origin` (backend Python) của các sự kiện nhận dạng.
+    motionOrigin: string;
     cameras: ICameraResponse[];
     wallCameraIds: string[];
     onClose: () => void;
@@ -43,7 +51,13 @@ export function EventFeedPanel({
         boxColor?: string;
     } | null>(null);
 
+    // Chuyển động là chip RIÊNG, không nằm trong `enabled`: nó không phải một
+    // FeedTab (xem MOTION_META). Tắt chip là ĐÓNG LUÔN socket engine chứ không
+    // chỉ ẩn — không giữ kết nối cho thứ đang không xem.
+    const [motionOn, setMotionOn] = useState(true);
+
     const { events, connected } = useLiveEventFeed(origin, true);
+    const motionFeed = useMotionEventFeed(motionOrigin, motionOn);
 
     const cameraName = useMemo(() => {
         const map = new Map<string, string>();
@@ -61,21 +75,92 @@ export function EventFeedPanel({
         });
     };
 
-    const visible = events.filter(
-        (e) => enabled.has(e.tab) && (!onlyWall || wallSet.has(e.event.camera_id)),
-    );
+    // Gộp nhận dạng + chuyển động thành MỘT dòng thời gian, mới nhất lên đầu.
+    // Mốc sắp xếp là lúc GÓI TIN VỀ (receivedAt / endMs — engine chỉ bắn khi
+    // chuyển động đã kết thúc), không phải timestamp của sự kiện: hai backend
+    // khác nhau, lệch đồng hồ vài giây là danh sách nhảy lung tung.
+    const visible = useMemo(() => {
+        const rows: Array<{ sortMs: number; node: React.ReactNode }> = [];
+
+        for (const e of events) {
+            if (!enabled.has(e.tab)) continue;
+            if (onlyWall && !wallSet.has(e.event.camera_id)) continue;
+            rows.push({
+                sortMs: e.receivedAt,
+                node: (
+                    <FeedRow
+                        key={e.key}
+                        tab={e.tab}
+                        event={e.event}
+                        cameraLabel={cameraName.get(e.event.camera_id) || e.event.camera_id}
+                        onOpen={(url, label, box, boxColor) =>
+                            setLightbox({ url, label, box, boxColor })
+                        }
+                    />
+                ),
+            });
+        }
+
+        if (motionOn) {
+            for (const m of motionFeed.events) {
+                if (onlyWall && !wallSet.has(m.cameraId)) continue;
+                rows.push({
+                    sortMs: m.endMs,
+                    node: (
+                        <MotionFeedRow
+                            key={m.key}
+                            cameraId={m.cameraId}
+                            cameraLabel={cameraName.get(m.cameraId) || m.cameraId}
+                            startMs={m.startMs}
+                            endMs={m.endMs}
+                            cells={m.cells}
+                            gridX={m.gridX}
+                            gridY={m.gridY}
+                            cellCount={parseMotionCells(m.cells, m.gridX, m.gridY).length}
+                        />
+                    ),
+                });
+            }
+        }
+
+        rows.sort((a, b) => b.sortMs - a.sortMs);
+        return rows;
+    }, [events, motionFeed.events, enabled, motionOn, onlyWall, wallSet, cameraName]);
+
+    const nothingSelected = enabled.size === 0 && !motionOn;
 
     return (
-        <aside className="flex w-96 shrink-0 flex-col border-l border-slate-800 bg-slate-900">
-            {/* Tiêu đề + trạng thái kết nối + đóng */}
-            <div className="flex items-center gap-2 border-b border-slate-800 px-4 py-3">
+        <aside
+            /* Nằm DƯỚI tường video chứ không phủ lên (xem mẫu người dùng đưa).
+               flex-1 chứ không chốt 42vh nữa: tường ở trên đã lấy đúng chiều
+               cao nó cần nên phần này cứ nhận hết chỗ dư — nhiều hơn hẳn 42vh
+               mà không phải đoán trước con số. Nút chuông vẫn tắt được để xem
+               tường toàn màn. */
+            className="flex min-h-0 flex-1 flex-col border-t border-slate-800 bg-slate-900 md:w-96 md:flex-none md:shrink-0 md:border-l md:border-t-0"
+        >
+            {/* Tiêu đề + trạng thái kết nối + đóng — CHỈ từ md.
+                Dưới md nút chuông trên thanh công cụ đã đóng/mở được bảng này,
+                nên hàng tiêu đề chỉ còn là chữ trang trí ăn mất ~45px của một
+                khung cao 42vh. */}
+            <div className="hidden items-center gap-2 border-b border-slate-800 px-4 py-3 md:flex">
                 <Bell size={15} className="text-slate-300" aria-hidden="true" />
                 <h2 className="text-sm font-semibold text-white">Sự kiện</h2>
+                {/* Chấm chỉ xanh khi MỌI socket đang bật đều nối được: chuyển
+                    động đi qua engine, còn lại qua Python — một bên chết mà
+                    chấm vẫn xanh thì người dùng ngồi chờ sự kiện không bao giờ tới. */}
                 <span
-                    title={connected ? "Đang nhận realtime" : "Mất kết nối"}
+                    title={
+                        !connected
+                            ? "Mất kết nối sự kiện nhận dạng"
+                            : motionOn && !motionFeed.connected
+                              ? "Mất kết nối sự kiện chuyển động"
+                              : "Đang nhận realtime"
+                    }
                     className={cn(
                         "h-1.5 w-1.5 rounded-full",
-                        connected ? "bg-emerald-400" : "bg-slate-600",
+                        connected && (!motionOn || motionFeed.connected)
+                            ? "bg-emerald-400"
+                            : "bg-slate-600",
                     )}
                 />
                 <button
@@ -89,7 +174,7 @@ export function EventFeedPanel({
             </div>
 
             {/* Bộ lọc loại sự kiện + phạm vi camera */}
-            <div className="flex flex-col gap-2 border-b border-slate-800 px-3 py-2.5">
+            <div className="flex flex-col gap-1.5 border-b border-slate-800 px-3 py-1.5 md:gap-2 md:py-2.5">
                 <div className="flex flex-wrap gap-1.5">
                     {ALL_TABS.map((tab) => {
                         const on = enabled.has(tab);
@@ -99,7 +184,9 @@ export function EventFeedPanel({
                                 type="button"
                                 onClick={() => toggleTab(tab)}
                                 className={cn(
-                                    "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                                    // Gọn hơn dưới md — xem ghi chú cùng loại ở
+                                    // recordings/event-feed-panel.tsx.
+                                    "rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors md:px-2.5 md:py-1 md:text-xs",
                                     on
                                         ? TYPE_META[tab].chip
                                         : "border-slate-700 text-slate-500 hover:text-slate-300",
@@ -109,6 +196,18 @@ export function EventFeedPanel({
                             </button>
                         );
                     })}
+                    <button
+                        type="button"
+                        onClick={() => setMotionOn((v) => !v)}
+                        className={cn(
+                            "rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors md:px-2.5 md:py-1 md:text-xs",
+                            motionOn
+                                ? MOTION_META.chip
+                                : "border-slate-700 text-slate-500 hover:text-slate-300",
+                        )}
+                    >
+                        {MOTION_META.label}
+                    </button>
                 </div>
                 <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-400">
                     <input
@@ -123,7 +222,7 @@ export function EventFeedPanel({
 
             {/* Dòng sự kiện realtime */}
             <div className="min-h-0 flex-1 overflow-y-auto">
-                {enabled.size === 0 ? (
+                {nothingSelected ? (
                     <p className="px-4 py-6 text-center text-xs text-slate-500">
                         Chọn ít nhất một loại sự kiện ở trên
                     </p>
@@ -133,17 +232,7 @@ export function EventFeedPanel({
                     </p>
                 ) : (
                     <ul className="flex flex-col gap-2.5 p-3">
-                        {visible.map((item) => (
-                            <FeedRow
-                                key={item.key}
-                                tab={item.tab}
-                                event={item.event}
-                                cameraLabel={cameraName.get(item.event.camera_id) || item.event.camera_id}
-                                onOpen={(url, label, box, boxColor) =>
-                                    setLightbox({ url, label, box, boxColor })
-                                }
-                            />
-                        ))}
+                        {visible.map((row) => row.node)}
                     </ul>
                 )}
             </div>

@@ -3,7 +3,7 @@ import { MainLayout } from "@/components/layouts/main-layout";
 
 export default function PlateWhiteList() {
     return (
-        <MainLayout>
+        <MainLayout title="Biển số trắng">
             <PlateWhiteListDashboard />
         </MainLayout>
     );

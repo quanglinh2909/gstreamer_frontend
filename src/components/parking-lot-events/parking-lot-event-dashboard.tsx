@@ -1,5 +1,6 @@
 import { AlertTriangle, Filter, RefreshCw, ScanLine, SquareParking, UserRound, X } from "lucide-react";
 import type { ParkingLotEventManager } from "@/hooks/use-parking-lot-event-manager";
+import { TopBarButton, TopBarCount } from "@/components/layouts/top-bar";
 import { ParkingLotEventPagination } from "./parking-lot-event-pagination";
 import { ParkingLotEventTable } from "./parking-lot-event-table";
 import { cn } from "./parking-lot-event-utils";
@@ -25,11 +26,28 @@ function ParkingLotEventSkeleton() {
     );
 }
 
+// Cho thanh trên của MainLayout (chỉ khổ điện thoại).
+export function ParkingLotEventTopActions({ manager }: { manager: ParkingLotEventManager }) {
+    return (
+        <>
+            <TopBarCount value={manager.parkingLotEventPage.total} unit="sự kiện" />
+            <TopBarButton
+                icon={RefreshCw}
+                label="Làm mới"
+                onClick={manager.refreshEvents}
+                disabled={manager.isLoading}
+                spinning={manager.isLoading}
+            />
+        </>
+    );
+}
+
 export function ParkingLotEventDashboard({ manager }: { manager: ParkingLotEventManager }) {
     return (
         <main className="h-full overflow-y-auto bg-slate-50">
-            <div className="mx-auto flex min-h-full max-w-[1400px] flex-col gap-5 px-6 py-5">
-                <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="mx-auto flex min-h-full max-w-[1400px] flex-col gap-3 px-3 py-3 sm:gap-5 sm:px-6 sm:py-5">
+                {/* Tiêu đề + số đếm + nút làm mới đã lên thanh trên ở khổ điện thoại. */}
+                <header className="hidden flex-col gap-4 md:flex lg:flex-row lg:items-center lg:justify-between">
                     <div>
                         <p className="text-sm font-semibold text-[#4369ee]">Parking</p>
                         <h1 className="mt-1 text-2xl font-semibold text-slate-950">Sự kiện bãi xe</h1>
@@ -60,10 +78,10 @@ export function ParkingLotEventDashboard({ manager }: { manager: ParkingLotEvent
 
                 <form
                     onSubmit={manager.handleFilterSubmit}
-                    className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
+                    className="rounded-xl border border-slate-200 bg-white p-2 shadow-sm sm:p-3"
                 >
-                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,160px)_auto]">
-                        <div className="relative">
+                    <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,160px)_auto]">
+                        <div className="relative min-w-0">
                             <UserRound
                                 size={16}
                                 aria-hidden="true"
@@ -76,7 +94,7 @@ export function ParkingLotEventDashboard({ manager }: { manager: ParkingLotEvent
                                 className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-slate-900 outline-none transition-colors focus:border-[#4369ee] focus:bg-white"
                             />
                         </div>
-                        <div className="relative">
+                        <div className="relative min-w-0">
                             <ScanLine
                                 size={16}
                                 aria-hidden="true"
@@ -97,7 +115,7 @@ export function ParkingLotEventDashboard({ manager }: { manager: ParkingLotEvent
                             placeholder="ID identity"
                             className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition-colors focus:border-[#4369ee] focus:bg-white"
                         />
-                        <div className="flex gap-2">
+                        <div className="flex min-w-0 gap-2">
                             <button
                                 type="submit"
                                 className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-lg border border-[#4369ee] bg-blue-50 px-5 text-sm font-semibold text-[#4369ee] transition-colors hover:bg-blue-100"

@@ -3,6 +3,8 @@ import { LoaderCircle, Save, X } from "lucide-react";
 import { AppSelect } from "@/components/common/app-select";
 import { HintLabel, type HintPlacement } from "@/components/common/hint-label";
 import type { ICameraResponse } from "@/interface/camera";
+import type { PlateGateGroup } from "@/interface/plate-gate-group";
+import type { PlateWhiteListSettings } from "@/interface/plate-white-list-settings";
 import type {
     PlateWhiteListSettingsFormMode,
     PlateWhiteListSettingsFormState,
@@ -39,6 +41,9 @@ export function PlateWhiteListSettingsFormModal({
     mode,
     form,
     availableCameras,
+    entries,
+    groups,
+    getCameraName,
     errorMessage,
     isSaving,
     onClose,
@@ -48,6 +53,10 @@ export function PlateWhiteListSettingsFormModal({
     mode: PlateWhiteListSettingsFormMode;
     form: PlateWhiteListSettingsFormState;
     availableCameras: ICameraResponse[];
+    /** Toàn bộ camera ĐÃ bật — để cho thấy ai đang cùng cụm với camera này. */
+    entries: PlateWhiteListSettings[];
+    groups: PlateGateGroup[];
+    getCameraName: (cameraId: string) => string;
     errorMessage: string;
     isSaving: boolean;
     onClose: () => void;
@@ -67,6 +76,21 @@ export function PlateWhiteListSettingsFormModal({
     }, [isSaving, onClose]);
 
     const isCreate = mode === "create";
+
+    const selectedGroupId = form.gateGroupId ? Number(form.gateGroupId) : null;
+    const selectedGroup = groups.find((group) => group.id === selectedGroupId) ?? null;
+
+    // Ai đang ở cùng cụm (trừ chính mình). Hiện ra ngay chứ không để người
+    // dùng tự dò: chọn nhầm cụm là âm thầm khoá một cổng khác.
+    const groupMates = selectedGroupId
+        ? entries
+              .filter(
+                  (entry) =>
+                      entry.camera_id !== form.cameraId &&
+                      entry.gate_group_id === selectedGroupId,
+              )
+              .map((entry) => getCameraName(entry.camera_id) || entry.camera_id)
+        : [];
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
@@ -142,6 +166,40 @@ export function PlateWhiteListSettingsFormModal({
                             onChange={(event) => onFieldChange("preTime", event.target.value)}
                             className={INPUT_CLASS}
                         />
+                    </Field>
+
+
+                    {/* CỤM CỔNG — ngay dưới "Chờ giữa 2 lần mở" vì nó QUYẾT
+                        ĐỊNH ô đó có được dùng hay không. */}
+                    <Field
+                        label="Cụm cổng"
+                        hint="Cụm gồm các camera cùng điều khiển MỘT barrier (làn vừa vào vừa ra). Khi camera thuộc cụm, thời gian chờ lấy của CỤM và ô “Chờ giữa 2 lần mở” ở trên không còn tác dụng. Tạo/sửa cụm ở tab “Cụm cổng”."
+                    >
+                        <AppSelect
+                            value={form.gateGroupId}
+                            onChange={(event) => onFieldChange("gateGroupId", event.target.value)}
+                            wrapperClassName="mt-2"
+                            className="h-11"
+                        >
+                            <option value="">Không thuộc cụm nào (cổng độc lập)</option>
+                            {groups.map((group) => (
+                                <option key={group.id} value={String(group.id)}>
+                                    {group.name} — chờ{" "}
+                                    {group.pre_time === 0 ? "1 lần duy nhất" : `${group.pre_time}s`}
+                                </option>
+                            ))}
+                        </AppSelect>
+                        {selectedGroup ? (
+                            <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+                                Đang dùng <b>{selectedGroup.pre_time === 0
+                                    ? "chỉ mở 1 lần"
+                                    : `${selectedGroup.pre_time}s`}</b> của cụm “{selectedGroup.name}”
+                                — ô “Chờ giữa 2 lần mở” ở trên bị bỏ qua.
+                                {groupMates.length > 0
+                                    ? ` Chung đồng hồ với: ${groupMates.join(", ")}.`
+                                    : ""}
+                            </p>
+                        ) : null}
                     </Field>
 
                     <Field

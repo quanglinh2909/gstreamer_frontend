@@ -21,6 +21,14 @@ export function getEventResultLabel(event, tab) {
         return event?.id ? `Vùng cấm #${event.id}` : "Vùng cấm";
     }
 
+    if (tab === "mask") {
+        // Nhãn phải nói KẾT QUẢ, không phải "khẩu trang #12": người xem lướt
+        // bảng này để tìm ai KHÔNG đeo.
+        if (event?.mask_status === "wearing_mask") return "Có khẩu trang";
+        if (event?.mask_status === "not_wearing_mask") return "KHÔNG khẩu trang";
+        return UNKNOWN_RESULT_LABEL;
+    }
+
     const value = tab === "face" ? event?.name : event?.plate_number;
 
     return asText(value) || UNKNOWN_RESULT_LABEL;

@@ -13,17 +13,19 @@ import {
 } from "lucide-react";
 import type { CameraManager, CameraSocketStatus } from "@/hooks/use-camera-manager";
 import { useLiveViewers } from "@/hooks/use-live-viewers";
+import { TopBarButton, TopBarCount, TopBarDot } from "@/components/layouts/top-bar";
 import { CameraCard } from "./camera-card";
 import { featureFilters, statusFilters } from "./camera-constants";
 import { CameraFormModal } from "./camera-form-modal";
 import { CameraStatCard } from "./camera-stat-card";
 import { cn } from "./camera-utils";
 import { DeleteCameraModal } from "./delete-camera-modal";
+import { RecordingToggleModal } from "./recording-toggle-modal";
 
 const SOCKET_META: Record<CameraSocketStatus, { label: string; dot: string; text: string }> = {
-    idle: { label: "Offline", dot: "bg-slate-400", text: "text-slate-500" },
+    idle: { label: "Ngoại tuyến", dot: "bg-slate-400", text: "text-slate-500" },
     connecting: { label: "Đang kết nối", dot: "bg-amber-400 animate-pulse", text: "text-amber-600" },
-    connected: { label: "Live", dot: "bg-emerald-500 animate-pulse", text: "text-emerald-600" },
+    connected: { label: "Trực tuyến", dot: "bg-emerald-500 animate-pulse", text: "text-emerald-600" },
     reconnecting: { label: "Kết nối lại", dot: "bg-amber-400 animate-pulse", text: "text-amber-600" },
     error: { label: "Mất kết nối", dot: "bg-rose-500", text: "text-rose-600" },
 };
@@ -43,23 +45,57 @@ function CameraSocketBadge({ status }: { status: CameraSocketStatus }) {
     );
 }
 
+// Cho thanh trên của MainLayout (chỉ khổ điện thoại).
+export function CameraTopStatus({ manager }: { manager: CameraManager }) {
+    const status = manager.socketStatus;
+    return (
+        <TopBarDot
+            tone={status === "connected" ? "ok" : status === "error" ? "bad" : status === "idle" ? "idle" : "warn"}
+            label={SOCKET_META[status].label}
+        />
+    );
+}
+
+export function CameraTopActions({ manager }: { manager: CameraManager }) {
+    return (
+        <>
+            <TopBarCount value={manager.stats.total} unit="camera" />
+            <TopBarButton
+                icon={Plus}
+                label="Thêm camera"
+                tone="primary"
+                onClick={manager.openCreateCamera}
+            />
+            <TopBarButton
+                icon={RefreshCw}
+                label="Làm mới"
+                onClick={() => void manager.fetchCameras()}
+                disabled={manager.isLoading}
+                spinning={manager.isLoading}
+            />
+        </>
+    );
+}
+
 export function CameraDashboard({ manager }: { manager: CameraManager }) {
     // Số người đang xem trực tiếp từng camera (toàn hệ thống) — badge trên thẻ.
     const { liveByCamera } = useLiveViewers(5000);
     return (
         <main className="h-full overflow-y-auto bg-slate-50">
-            <div className="mx-auto flex min-h-full max-w-[1600px] flex-col gap-5 px-6 py-5">
-                <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="mx-auto flex min-h-full max-w-[1600px] flex-col gap-5 px-3 py-4 sm:px-6 sm:py-5">
+                {/* Tiêu đề + hai nút đã dồn lên thanh trên ở khổ điện thoại
+                    (xem CameraTopActions). */}
+                <header className="hidden flex-col gap-4 md:flex lg:flex-row lg:items-center lg:justify-between">
                     <div>
                         <div className="flex items-center gap-3">
-                            <p className="text-sm font-semibold text-[#4369ee]">Monitoring</p>
+                            <p className="text-sm font-semibold text-[#4369ee]">Giám sát</p>
                             <CameraSocketBadge status={manager.socketStatus} />
                         </div>
-                        <h1 className="mt-1 text-2xl font-semibold text-slate-950">Cameras</h1>
+                        <h1 className="mt-1 text-2xl font-semibold text-slate-950">Danh sách camera</h1>
                         <p className="mt-1 text-sm text-slate-500">
                             {manager.lastUpdated
-                                ? `Last updated ${manager.lastUpdated.toLocaleTimeString()}`
-                                : "Camera overview"}
+                                ? `Cập nhật lúc ${manager.lastUpdated.toLocaleTimeString()}`
+                                : "Tổng quan camera"}
                         </p>
                     </div>
 
@@ -70,7 +106,7 @@ export function CameraDashboard({ manager }: { manager: CameraManager }) {
                             className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#4369ee] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#3156d4]"
                         >
                             <Plus size={16} aria-hidden="true" />
-                            Add Camera
+                            Thêm camera
                         </button>
                         <button
                             type="button"
@@ -83,22 +119,22 @@ export function CameraDashboard({ manager }: { manager: CameraManager }) {
                                 className={cn(manager.isLoading && "animate-spin")}
                                 aria-hidden="true"
                             />
-                            Refresh
+                            Làm mới
                         </button>
                     </div>
                 </header>
 
-                <section className="grid grid-cols-2 gap-3 lg:grid-cols-6">
-                    <CameraStatCard label="Total" value={manager.stats.total} icon={Video} tone="bg-blue-50 text-blue-700" />
-                    <CameraStatCard label="Online" value={manager.stats.online} icon={CheckCircle2} tone="bg-emerald-50 text-emerald-700" />
-                    <CameraStatCard label="Offline" value={manager.stats.offline} icon={WifiOff} tone="bg-slate-100 text-slate-700" />
-                    <CameraStatCard label="Errors" value={manager.stats.error} icon={AlertTriangle} tone="bg-rose-50 text-rose-700" />
-                    <CameraStatCard label="Recording" value={manager.stats.recording} icon={HardDrive} tone="bg-indigo-50 text-indigo-700" />
-                    <CameraStatCard label="Motion" value={manager.stats.motion} icon={Activity} tone="bg-amber-50 text-amber-700" />
+                <section className="grid grid-cols-3 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-6">
+                    <CameraStatCard label="Tổng" value={manager.stats.total} icon={Video} tone="bg-blue-50 text-blue-700" />
+                    <CameraStatCard label="Trực tuyến" value={manager.stats.online} icon={CheckCircle2} tone="bg-emerald-50 text-emerald-700" />
+                    <CameraStatCard label="Ngoại tuyến" value={manager.stats.offline} icon={WifiOff} tone="bg-slate-100 text-slate-700" />
+                    <CameraStatCard label="Lỗi" value={manager.stats.error} icon={AlertTriangle} tone="bg-rose-50 text-rose-700" />
+                    <CameraStatCard label="Đang ghi" value={manager.stats.recording} icon={HardDrive} tone="bg-indigo-50 text-indigo-700" />
+                    <CameraStatCard label="Chuyển động" value={manager.stats.motion} icon={Activity} tone="bg-amber-50 text-amber-700" />
                 </section>
 
-                <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-                    <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                <section className="rounded-lg border border-slate-200 bg-white p-2 shadow-sm sm:p-3">
+                    <div className="flex flex-col gap-2 sm:gap-3 xl:flex-row xl:items-center xl:justify-between">
                         <div className="relative min-w-0 flex-1">
                             <Search
                                 size={17}
@@ -108,12 +144,14 @@ export function CameraDashboard({ manager }: { manager: CameraManager }) {
                             <input
                                 value={manager.searchText}
                                 onChange={(event) => manager.setSearchText(event.target.value)}
-                                placeholder="Search camera, status, codec, hardware..."
+                                placeholder="Tìm camera..."
                                 className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-[#4369ee] focus:bg-white"
                             />
                         </div>
 
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                        {/* flex-wrap: hai cụm lọc xếp cạnh nhau, thiếu chỗ thì tự
+                            xuống hàng — hơn là ép mỗi cụm một hàng cố định. */}
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                             <div className="flex rounded-lg bg-slate-100 p-1">
                                 {statusFilters.map((filter) => (
                                     <button
@@ -121,7 +159,7 @@ export function CameraDashboard({ manager }: { manager: CameraManager }) {
                                         type="button"
                                         onClick={() => manager.setStatusFilter(filter.value)}
                                         className={cn(
-                                            "h-8 rounded-md px-3 text-sm font-semibold transition-colors",
+                                            "h-8 rounded-md px-2.5 text-xs font-semibold transition-colors sm:px-3 sm:text-sm",
                                             manager.statusFilter === filter.value
                                                 ? "bg-white text-slate-950 shadow-sm"
                                                 : "text-slate-500 hover:text-slate-900",
@@ -139,7 +177,7 @@ export function CameraDashboard({ manager }: { manager: CameraManager }) {
                                         type="button"
                                         onClick={() => manager.setFeatureFilter(filter.value)}
                                         className={cn(
-                                            "h-8 rounded-md px-3 text-sm font-semibold transition-colors",
+                                            "h-8 rounded-md px-2.5 text-xs font-semibold transition-colors sm:px-3 sm:text-sm",
                                             manager.featureFilter === filter.value
                                                 ? "bg-white text-slate-950 shadow-sm"
                                                 : "text-slate-500 hover:text-slate-900",
@@ -157,7 +195,7 @@ export function CameraDashboard({ manager }: { manager: CameraManager }) {
                     <section className="flex items-start gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
                         <AlertTriangle className="mt-0.5 shrink-0" size={18} aria-hidden="true" />
                         <div className="min-w-0">
-                            <p className="font-semibold">Cannot load cameras</p>
+                            <p className="font-semibold">Không tải được danh sách camera</p>
                             <p className="mt-1 break-words">{manager.errorMessage}</p>
                         </div>
                     </section>
@@ -167,7 +205,7 @@ export function CameraDashboard({ manager }: { manager: CameraManager }) {
                     <section className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white py-20 text-slate-500">
                         <div className="flex flex-col items-center gap-3 text-center">
                             <LoaderCircle className="animate-spin text-[#4369ee]" size={34} aria-hidden="true" />
-                            <p className="text-sm font-semibold">Loading cameras...</p>
+                            <p className="text-sm font-semibold">Đang tải danh sách camera...</p>
                         </div>
                     </section>
                 ) : null}
@@ -176,8 +214,8 @@ export function CameraDashboard({ manager }: { manager: CameraManager }) {
                     <section className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white py-20 text-slate-500">
                         <div className="flex max-w-sm flex-col items-center gap-3 text-center">
                             <CameraIcon size={38} className="text-slate-400" aria-hidden="true" />
-                            <p className="text-base font-semibold text-slate-800">No cameras found</p>
-                            <p className="text-sm">Try changing the search text or filters.</p>
+                            <p className="text-base font-semibold text-slate-800">Không có camera phù hợp</p>
+                            <p className="text-sm">Thử đổi từ khóa hoặc bỏ bớt bộ lọc.</p>
                         </div>
                     </section>
                 ) : null}
@@ -190,6 +228,7 @@ export function CameraDashboard({ manager }: { manager: CameraManager }) {
                                 camera={camera}
                                 onEdit={manager.openEditCamera}
                                 onDelete={manager.openDeleteCamera}
+                                onToggleRecording={manager.openRecordingToggle}
                                 viewers={liveByCamera.get(camera.id) ?? 0}
                             />
                         ))}
@@ -206,6 +245,18 @@ export function CameraDashboard({ manager }: { manager: CameraManager }) {
                     onClose={manager.closeCameraForm}
                     onSubmit={manager.handleCameraFormSubmit}
                     onChange={manager.updateCameraForm}
+                />
+            ) : null}
+
+            {manager.recordingTarget ? (
+                <RecordingToggleModal
+                    camera={manager.recordingTarget.camera}
+                    kind={manager.recordingTarget.kind}
+                    turnOn={manager.recordingTarget.turnOn}
+                    errorMessage={manager.recordingErrorMessage}
+                    isSaving={manager.isSavingRecording}
+                    onClose={manager.closeRecordingToggle}
+                    onConfirm={(patch) => void manager.confirmRecordingToggle(patch)}
                 />
             ) : null}
 

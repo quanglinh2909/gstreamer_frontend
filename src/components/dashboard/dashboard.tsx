@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import {
+    Activity,
     AlertTriangle,
     Car,
     Clock,
@@ -9,13 +10,16 @@ import {
     LoaderCircle,
     Layers,
     MemoryStick,
+    RefreshCw,
     ScanFace,
     ScanLine,
+    Shield,
     ShieldAlert,
     Thermometer,
     Zap,
 } from "lucide-react";
 import type { DashboardManager, SocketStatus } from "@/hooks/use-dashboard-manager";
+import { TopBarButton, TopBarDot } from "@/components/layouts/top-bar";
 import { DateRangeControl } from "./date-range-control";
 import {
     cn,
@@ -36,6 +40,8 @@ const AI_TYPE_META: Record<string, { label: string; icon: typeof Car; tone: stri
     plate_recognition: { label: "Nhận diện biển số", icon: Car, tone: "bg-blue-50 text-blue-700" },
     face_recognition: { label: "Nhận diện khuôn mặt", icon: ScanFace, tone: "bg-violet-50 text-violet-700" },
     restricted_area: { label: "Vùng hạn chế", icon: ShieldAlert, tone: "bg-amber-50 text-amber-700" },
+    // Thiếu dòng này thì thẻ hiện đúng chuỗi khoá của backend ("face_mask").
+    face_mask: { label: "Nhận diện khẩu trang", icon: Shield, tone: "bg-rose-50 text-rose-700" },
 };
 
 const SOCKET_META: Record<SocketStatus, { label: string; dot: string; text: string }> = {
@@ -58,6 +64,29 @@ function SocketStatusBadge({ status }: { status: SocketStatus }) {
             <span className={cn("h-2 w-2 rounded-full", meta.dot)} aria-hidden="true" />
             {meta.label}
         </span>
+    );
+}
+
+// Cho thanh trên của MainLayout (chỉ khổ điện thoại).
+export function DashboardTopStatus({ manager }: { manager: DashboardManager }) {
+    const status = manager.socketStatus;
+    return (
+        <TopBarDot
+            tone={status === "connected" ? "ok" : status === "error" ? "bad" : status === "idle" ? "idle" : "warn"}
+            label={SOCKET_META[status].label}
+        />
+    );
+}
+
+export function DashboardTopActions({ manager }: { manager: DashboardManager }) {
+    return (
+        <TopBarButton
+            icon={RefreshCw}
+            label="Làm mới"
+            onClick={manager.refresh}
+            disabled={manager.isLoading}
+            spinning={manager.isLoading}
+        />
     );
 }
 
@@ -144,9 +173,11 @@ export function Dashboard({ manager }: { manager: DashboardManager }) {
 
     return (
         <main className="h-full overflow-y-auto bg-slate-50">
-            <div className="mx-auto flex min-h-full max-w-[1600px] flex-col gap-5 px-6 py-5">
-                <header className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-                    <div>
+            <div className="mx-auto flex min-h-full max-w-[1600px] flex-col gap-5 px-3 py-4 sm:px-6 sm:py-5">
+                <header className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between xl:gap-4">
+                    {/* Tiêu đề + trạng thái socket đã nằm ở thanh trên của
+                        MainLayout trên điện thoại (xem DashboardTopActions). */}
+                    <div className="hidden md:block">
                         <div className="flex items-center gap-3">
                             <p className="text-sm font-semibold text-[#4369ee]">Monitoring</p>
                             <SocketStatusBadge status={manager.socketStatus} />
@@ -218,6 +249,17 @@ export function Dashboard({ manager }: { manager: DashboardManager }) {
                                         />
                                     );
                                 })}
+                                {/* Chuyển động đứng RIÊNG, không cộng vào "Tổng
+                                    AI bật": nó không chạy model nào, không dùng
+                                    NPU, và đếm theo CAMERA chứ không theo luồng
+                                    AI. Gộp vào là con số tổng hết nghĩa. */}
+                                <MetricCard
+                                    label="Phát hiện chuyển động"
+                                    value={String(aiCount?.motion_cameras ?? 0)}
+                                    subtitle={`${aiCount?.motion_recording_cameras ?? 0} camera ghi theo chuyển động`}
+                                    icon={Activity}
+                                    tone="bg-rose-50 text-rose-700"
+                                />
                             </div>
                         </section>
 

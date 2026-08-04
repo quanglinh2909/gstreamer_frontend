@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { cameraApi } from "@/backend-api/camera-api";
+import { faceMaskApi } from "@/backend-api/face-mask-api";
 import { faceRecognitionApi } from "@/backend-api/face-recognition-api";
 import { plateRecognitionApi } from "@/backend-api/plate-recognition-api";
 import { restrictedAreaApi } from "@/backend-api/restricted-area-api";
@@ -57,7 +58,12 @@ function asEventPage(data: unknown, fallbackPage: number): RecognitionEventPage 
     };
 }
 
-export function useEventManager(websocketOrigin = "") {
+export function useEventManager(
+    websocketOrigin = "",
+    // Loại sự kiện mở sẵn. Trang khẩu trang truyền "mask" để không phải nạp
+    // khuôn mặt một lượt rồi mới nhảy tab.
+    initialTab: RecognitionEventTab = "face",
+) {
     const socketStatus = useEventSocketStore((state) => state.status);
     const socketErrorMessage = useEventSocketStore((state) => state.errorMessage);
     const receivedEvents = useEventSocketStore((state) => state.receivedEvents);
@@ -66,15 +72,15 @@ export function useEventManager(websocketOrigin = "") {
     const [cameras, setCameras] = useState<ICameraResponse[]>([]);
     const [isCameraLoading, setIsCameraLoading] = useState(true);
     const [cameraErrorMessage, setCameraErrorMessage] = useState("");
-    const [activeTab, setActiveTab] = useState<RecognitionEventTab>("face");
+    const [activeTab, setActiveTab] = useState<RecognitionEventTab>(initialTab);
     const [selectedCameraId, setSelectedCameraId] = useState("");
-    const [pagesByTab, setPagesByTab] = useState<PagesByTab>({ plate: 1, face: 1, restricted: 1 });
+    const [pagesByTab, setPagesByTab] = useState<PagesByTab>({ plate: 1, face: 1, restricted: 1, mask: 1 });
     const [eventPage, setEventPage] = useState<RecognitionEventPage>(() => getEmptyEventPage());
     const [isLoading, setIsLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState("");
     const [refreshKey, setRefreshKey] = useState(0);
     const [selectedEvent, setSelectedEvent] = useState<RecognitionEvent | null>(null);
-    const [pendingEventsByTab, setPendingEventsByTab] = useState<PendingEventsByTab>({ plate: 0, face: 0, restricted: 0 });
+    const [pendingEventsByTab, setPendingEventsByTab] = useState<PendingEventsByTab>({ plate: 0, face: 0, restricted: 0, mask: 0 });
     const handledSequenceRef = useRef(0);
     const currentPage = pagesByTab[activeTab];
     const pendingEvents = pendingEventsByTab[activeTab];
@@ -143,7 +149,9 @@ export function useEventManager(websocketOrigin = "") {
                         ? await plateRecognitionApi.events(params)
                         : activeTab === "restricted"
                             ? await restrictedAreaApi.events(params)
-                            : await faceRecognitionApi.events(params);
+                            : activeTab === "mask"
+                                ? await faceMaskApi.events(params)
+                                : await faceRecognitionApi.events(params);
 
                 if (!isCancelled) {
                     let nextPage = asEventPage(data, currentPage);
@@ -240,8 +248,8 @@ export function useEventManager(websocketOrigin = "") {
 
     const handleSelectCamera = (cameraId: string) => {
         setSelectedCameraId(cameraId);
-        setPagesByTab({ plate: 1, face: 1, restricted: 1 });
-        setPendingEventsByTab({ plate: 0, face: 0, restricted: 0 });
+        setPagesByTab({ plate: 1, face: 1, restricted: 1, mask: 1 });
+        setPendingEventsByTab({ plate: 0, face: 0, restricted: 0, mask: 0 });
         setSelectedEvent(null);
     };
 

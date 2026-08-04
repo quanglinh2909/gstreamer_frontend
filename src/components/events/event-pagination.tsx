@@ -23,10 +23,11 @@ export function EventPagination({
                 type="button"
                 disabled={currentPage <= 1}
                 onClick={() => onPageChange(currentPage - 1)}
-                className="inline-flex h-10 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label="Trang trước"
+                className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-sm font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-40 sm:h-10 sm:px-3"
             >
                 <ChevronLeft size={16} aria-hidden="true" />
-                Trước
+                <span className="hidden sm:inline">Trước</span>
             </button>
 
             {visiblePages.map((page) =>
@@ -37,7 +38,7 @@ export function EventPagination({
                         aria-current={page === currentPage ? "page" : undefined}
                         onClick={() => onPageChange(page)}
                         className={cn(
-                            "flex h-10 min-w-10 items-center justify-center rounded-lg border px-3 text-sm font-semibold transition-colors",
+                            "flex h-9 min-w-9 items-center justify-center rounded-lg border px-2.5 text-sm font-semibold transition-colors sm:h-10 sm:min-w-10 sm:px-3",
                             page === currentPage
                                 ? "border-[#4369ee] bg-[#4369ee] text-white shadow-sm"
                                 : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-950",
@@ -56,9 +57,10 @@ export function EventPagination({
                 type="button"
                 disabled={currentPage >= totalPages}
                 onClick={() => onPageChange(currentPage + 1)}
-                className="inline-flex h-10 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label="Trang sau"
+                className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-sm font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-40 sm:h-10 sm:px-3"
             >
-                Sau
+                <span className="hidden sm:inline">Sau</span>
                 <ChevronRight size={16} aria-hidden="true" />
             </button>
         </nav>

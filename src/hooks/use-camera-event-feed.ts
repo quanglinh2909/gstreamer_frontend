@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RecognitionEvent, RecognitionEventTab } from "@/interface/recognition-event";
 import { getEventSocketUrl } from "@/lib/event-view-model";
 import type { FeedTab } from "@/lib/event-feed-shared";
+import { faceMaskApi } from "@/backend-api/face-mask-api";
 import { faceRecognitionApi } from "@/backend-api/face-recognition-api";
 import { plateRecognitionApi } from "@/backend-api/plate-recognition-api";
 import { restrictedAreaApi } from "@/backend-api/restricted-area-api";
@@ -21,7 +22,9 @@ export type FeedEvent = {
 const SOCKET_TABS: FeedTab[] = ["face", "plate", "restricted", "mask"];
 // Chỉ 3 loại này có bảng DB để phân trang lịch sử. Khẩu trang (mask) KHÔNG lưu
 // DB (ảnh đi inline base64 qua ws) nên chỉ xuất hiện từ realtime trở đi.
-const HISTORY_TABS: RecognitionEventTab[] = ["face", "plate", "restricted"];
+// Khẩu trang có mặt ở đây từ khi nó có bảng riêng (event_mask). Trước đó nó
+// chỉ tồn tại trên WebSocket nên trang Xem lại mở ra là mất sạch sự kiện cũ.
+const HISTORY_TABS: RecognitionEventTab[] = ["face", "plate", "restricted", "mask"];
 const HISTORY_PAGE_SIZE = 15;
 const MAX_LIVE = 60;
 const RECONNECT_MS = 2000;
@@ -30,6 +33,7 @@ const historyApi = {
     face: faceRecognitionApi,
     plate: plateRecognitionApi,
     restricted: restrictedAreaApi,
+    mask: faceMaskApi,
 } as const;
 
 type PageState = { next: number; pages: number };
@@ -39,6 +43,7 @@ const initialPages = (): Record<RecognitionEventTab, PageState> => ({
     face: { next: 1, pages: 1 },
     plate: { next: 1, pages: 1 },
     restricted: { next: 1, pages: 1 },
+    mask: { next: 1, pages: 1 },
 });
 
 export function useCameraEventFeed(origin: string, cameraId: string | null, active: boolean) {

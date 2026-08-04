@@ -4,6 +4,7 @@ import type {
     CameraStateMessage,
     ICameraCreate,
     ICameraResponse,
+    RecordingMode,
 } from "@/interface/camera";
 import {
     buildCameraPayload,
@@ -18,6 +19,10 @@ import type {
     FeatureFilter,
     StatusFilter,
 } from "@/components/camera/types";
+import type {
+    RecordingToggleKind,
+    RecordingTogglePatch,
+} from "@/components/camera/recording-toggle-modal";
 
 export type CameraSocketStatus =
     | "idle"
@@ -83,6 +88,15 @@ export function useCameraManager(websocketOrigin = "") {
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteErrorMessage, setDeleteErrorMessage] = useState("");
     const [socketStatus, setSocketStatus] = useState<CameraSocketStatus>("idle");
+    // Camera đang chờ xác nhận, kèm công tắc nào và hướng muốn chuyển sang.
+    // null = không có popup nào mở.
+    const [recordingTarget, setRecordingTarget] = useState<{
+        camera: ICameraResponse;
+        kind: RecordingToggleKind;
+        turnOn: boolean;
+    } | null>(null);
+    const [isSavingRecording, setIsSavingRecording] = useState(false);
+    const [recordingErrorMessage, setRecordingErrorMessage] = useState("");
 
     const fetchCameras = useCallback(async () => {
         setIsLoading(true);
@@ -285,6 +299,75 @@ export function useCameraManager(websocketOrigin = "") {
         }
     };
 
+    const openRecordingToggle = (
+        camera: ICameraResponse,
+        kind: RecordingToggleKind,
+        turnOn: boolean,
+    ) => {
+        setRecordingTarget({ camera, kind, turnOn });
+        setRecordingErrorMessage("");
+    };
+
+    const closeRecordingToggle = () => {
+        if (isSavingRecording) {
+            return;
+        }
+
+        setRecordingTarget(null);
+        setRecordingErrorMessage("");
+    };
+
+    const confirmRecordingToggle = async (patch: RecordingTogglePatch) => {
+        if (!recordingTarget) {
+            return;
+        }
+
+        const { camera, kind } = recordingTarget;
+        // Hai công tắc cùng ánh xạ xuống MỘT trường recordingMode của engine:
+        //   power     bật -> "always" (ghi liên tục), tắt -> "off"
+        //   eventOnly bật -> "motion" (chỉ giữ đoạn có sự kiện), tắt -> "always"
+        // Không có cờ thứ ba nào cả — 'motion' chính là "chỉ ghi khi có sự kiện".
+        const mode: RecordingMode =
+            kind === "power"
+                ? patch.turnOn
+                    ? "always"
+                    : "off"
+                : patch.turnOn
+                    ? "motion"
+                    : "always";
+
+        setIsSavingRecording(true);
+        setRecordingErrorMessage("");
+
+        try {
+            // recordingEnabled đi kèm mode chứ không suy ra ở backend: xem
+            // IRecordingPatch — engine tự nâng cờ lên khi mode khác "off", nên
+            // hai trường phải nhất quán ngay từ đây.
+            //
+            // Ghi trước/ghi sau chỉ gửi khi BẬT "chỉ ghi khi có sự kiện": đó là
+            // lúc duy nhất popup hỏi chúng, và gửi kèm ở lần tắt sẽ ghi đè giá
+            // trị người dùng đã đặt trong biểu mẫu Sửa camera.
+            await cameraApi.updateRecording(camera.id, {
+                recordingEnabled: mode !== "off",
+                recordingMode: mode,
+                ...(kind === "eventOnly" && patch.turnOn
+                    ? {
+                          preMotionSeconds: patch.preSeconds,
+                          postMotionSeconds: patch.postSeconds,
+                      }
+                    : {}),
+            });
+            setRecordingTarget(null);
+            // Nạp lại cả danh sách: engine dựng lại luồng nên state/lastChangedAt
+            // của camera cũng đổi theo, không riêng hai trường vừa gửi.
+            await fetchCameras();
+        } catch (error) {
+            setRecordingErrorMessage(getApiErrorMessage(error));
+        } finally {
+            setIsSavingRecording(false);
+        }
+    };
+
     const openDeleteCamera = (camera: ICameraResponse) => {
         setDeleteTarget(camera);
         setDeleteErrorMessage("");
@@ -340,6 +423,12 @@ export function useCameraManager(websocketOrigin = "") {
         openCreateCamera,
         openDeleteCamera,
         openEditCamera,
+        openRecordingToggle,
+        closeRecordingToggle,
+        confirmRecordingToggle,
+        recordingTarget,
+        recordingErrorMessage,
+        isSavingRecording,
         searchText,
         setFeatureFilter,
         setSearchText,

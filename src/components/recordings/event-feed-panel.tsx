@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bell, CornerDownLeft, ImageOff, Loader2, Maximize2, X } from "lucide-react";
 import type { RecognitionEvent } from "@/interface/recognition-event";
 import {
@@ -13,17 +13,25 @@ import {
     cn,
     feedLabel,
     getBox,
+    MOTION_META,
     TYPE_META,
     type BoxRect,
     type FeedTab,
 } from "@/lib/event-feed-shared";
 import { useCameraEventFeed } from "@/hooks/use-camera-event-feed";
+import { useMotionEventFeed } from "@/hooks/use-motion-event-feed";
+import { MotionFeedRow } from "@/components/common/motion-feed-row";
+import { parseMotionCells } from "@/components/common/motion-cells-overlay";
+import type { MotionEvent } from "@/lib/recordings";
 
 // Bảng sự kiện của MỘT camera trên trang Xem lại. Gộp realtime + lịch sử (cuộn
 // xuống tải thêm), bấm một sự kiện thì nhảy timeline tới đúng thời điểm đó.
 export function RecordingsEventPanel({
     feed,
+    cameraId,
     cameraLabel,
+    motionEvents,
+    motionOrigin,
     onSeek,
     onClose,
 }: {
@@ -31,11 +39,19 @@ export function RecordingsEventPanel({
     // cần đúng danh sách này để vẽ vạch, và nó phải còn dữ liệu cả khi panel
     // đang đóng.
     feed: ReturnType<typeof useCameraEventFeed>;
+    cameraId: string;
     cameraLabel: string;
+    // Chuyển động của NGÀY đang chọn — trang đã tải sẵn cho timeline, dùng lại
+    // thay vì gọi lại cùng một endpoint lần nữa.
+    motionEvents: MotionEvent[];
+    // Origin WebSocket của ENGINE (/wsc) cho chuyển động realtime.
+    motionOrigin: string;
     onSeek: (timestampSec: number) => void;
     onClose: () => void;
 }) {
     const [enabled, setEnabled] = useState<Set<FeedTab>>(() => new Set(ALL_TABS));
+    // Chip riêng, không nằm trong `enabled` — chuyển động không phải FeedTab.
+    const [motionOn, setMotionOn] = useState(true);
     const [lightbox, setLightbox] = useState<{
         url: string;
         label: string;
@@ -56,7 +72,87 @@ export function RecordingsEventPanel({
         });
     };
 
-    const visible = events.filter((e) => enabled.has(e.tab));
+    const liveMotion = useMotionEventFeed(motionOrigin, motionOn, cameraId);
+
+    // Chuyển động: lịch sử (REST, cả ngày) + realtime (WS engine). Khử trùng
+    // theo GIÂY bắt đầu — bản realtime không có id (engine bắn TRƯỚC khi ghi
+    // DB), nên id không dùng làm khoá chung được; mốc bắt đầu thì cùng một
+    // chuỗi ISO ở cả hai đường.
+    const motionRows = useMemo(() => {
+        if (!motionOn) return [];
+        const seen = new Set<number>();
+        const rows: Array<{ key: string; eventId?: string; startMs: number; endMs: number; cells: string; gridX: number; gridY: number }> = [];
+        const push = (
+            key: string,
+            startMs: number,
+            endMs: number,
+            cells: string,
+            gridX: number,
+            gridY: number,
+            // Id hàng motion_events — chỉ sự kiện LỊCH SỬ mới có; sự kiện
+            // realtime tới qua WebSocket trước khi engine ghi DB nên chưa có.
+            eventId?: string,
+        ) => {
+            if (!Number.isFinite(startMs)) return;
+            const sec = Math.floor(startMs / 1000);
+            if (seen.has(sec)) return;
+            seen.add(sec);
+            rows.push({ key, eventId, startMs, endMs, cells, gridX, gridY });
+        };
+        for (const m of liveMotion.events) {
+            push(m.key, m.startMs, m.endMs, m.cells, m.gridX, m.gridY);
+        }
+        for (const m of motionEvents) {
+            push(`h-${m.id}`, m.startMs, m.endMs, m.cells ?? "", m.gridX || 10, m.gridY || 10, m.id);
+        }
+        return rows;
+    }, [motionOn, liveMotion.events, motionEvents]);
+
+    // Gộp nhận dạng + chuyển động vào một dòng thời gian, mới nhất lên đầu.
+    const visible = useMemo(() => {
+        const rows: Array<{ sortMs: number; node: React.ReactNode }> = [];
+        for (const e of events) {
+            if (!enabled.has(e.tab)) continue;
+            rows.push({
+                sortMs: Number(e.event.timestamp) * 1000,
+                node: (
+                    <FeedRow
+                        key={e.key}
+                        tab={e.tab}
+                        event={e.event}
+                        onSeek={() => onSeek(Number(e.event.timestamp))}
+                        onOpen={(url, label, box, boxColor) =>
+                            setLightbox({ url, label, box, boxColor })
+                        }
+                    />
+                ),
+            });
+        }
+        for (const m of motionRows) {
+            rows.push({
+                sortMs: m.startMs,
+                node: (
+                    <MotionFeedRow
+                        key={m.key}
+                        cameraId={cameraId}
+                        eventId={m.eventId}
+                        startMs={m.startMs}
+                        endMs={m.endMs}
+                        cells={m.cells}
+                        gridX={m.gridX}
+                        gridY={m.gridY}
+                        cellCount={parseMotionCells(m.cells, m.gridX, m.gridY).length}
+                        // onSeek nhận GIÂY (giống sự kiện nhận dạng), không phải ms.
+                        onSeek={() => onSeek(m.startMs / 1000)}
+                    />
+                ),
+            });
+        }
+        rows.sort((a, b) => b.sortMs - a.sortMs);
+        return rows;
+    }, [events, motionRows, enabled, cameraId, onSeek]);
+
+    const nothingSelected = enabled.size === 0 && !motionOn;
 
     // Cuộn gần đáy -> tải thêm lịch sử. Kiểm tra cả sau mỗi lần render (danh
     // sách sau lọc có thể ngắn hơn khung nhìn nên chưa cuộn được).
@@ -73,16 +169,36 @@ export function RecordingsEventPanel({
     }, [visible.length, maybeLoadMore]);
 
     return (
-        <aside className="flex w-96 shrink-0 flex-col border-l border-slate-800 bg-slate-900">
-            {/* Tiêu đề */}
-            <div className="flex items-center gap-2 border-b border-slate-800 px-4 py-3">
+        <aside
+            /* Trên điện thoại KHÔNG phủ lên video mà nằm NGAY DƯỚI nó, chiếm
+               hết phần còn lại của màn hình — xem lại camera là vừa nhìn hình
+               vừa lướt sự kiện, che mất một trong hai thì hỏng cả việc. Cột
+               bên phải chỉ quay lại từ md. */
+            className="flex min-h-0 flex-1 flex-col border-t border-slate-800 bg-slate-900 md:w-96 md:flex-none md:shrink-0 md:border-l md:border-t-0"
+        >
+            {/* Tiêu đề — chỉ từ md.
+                Dưới md bảng này LUÔN nằm dưới video và không đóng được (nút
+                chuông đã ẩn ở khổ điện thoại), nên hàng tiêu đề chẳng nói thêm
+                gì mà ăn mất ~45px — bằng nửa một thẻ sự kiện. */}
+            <div className="hidden items-center gap-2 border-b border-slate-800 px-4 py-3 md:flex">
                 <Bell size={15} className="text-slate-300" aria-hidden="true" />
                 <h2 className="text-sm font-semibold text-white">Sự kiện camera</h2>
+                {/* Hai backend khác nhau: nhận dạng qua Python, chuyển động qua
+                    engine. Một bên chết mà chấm vẫn xanh thì người dùng ngồi
+                    chờ sự kiện không bao giờ tới. */}
                 <span
-                    title={connected ? "Đang nhận realtime" : "Mất kết nối"}
+                    title={
+                        !connected
+                            ? "Mất kết nối sự kiện nhận dạng"
+                            : motionOn && !liveMotion.connected
+                              ? "Mất kết nối sự kiện chuyển động"
+                              : "Đang nhận realtime"
+                    }
                     className={cn(
                         "h-1.5 w-1.5 rounded-full",
-                        connected ? "bg-emerald-400" : "bg-slate-600",
+                        connected && (!motionOn || liveMotion.connected)
+                            ? "bg-emerald-400"
+                            : "bg-slate-600",
                     )}
                 />
                 <button
@@ -96,8 +212,9 @@ export function RecordingsEventPanel({
             </div>
 
             {/* Bộ lọc loại + tên camera */}
-            <div className="flex flex-col gap-2 border-b border-slate-800 px-3 py-2.5">
-                <p className="truncate text-xs text-slate-400">
+            <div className="flex flex-col gap-2 border-b border-slate-800 px-3 py-1.5 md:py-2.5">
+                {/* Tên camera đã nằm ngay trên thanh công cụ ở khổ điện thoại */}
+                <p className="hidden truncate text-xs text-slate-400 md:block">
                     Camera: <span className="font-medium text-slate-200">{cameraLabel}</span>
                 </p>
                 <div className="flex flex-wrap gap-1.5">
@@ -109,7 +226,11 @@ export function RecordingsEventPanel({
                                 type="button"
                                 onClick={() => toggleTab(tab)}
                                 className={cn(
-                                    "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                                    // Gọn hơn dưới md: bốn chip cỡ desktop vừa
+                                    // đúng một hàng 390px nhưng không còn chỗ
+                                    // thở, chỉ cần nhãn dài thêm một chữ là
+                                    // xuống dòng thành hai hàng.
+                                    "rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors md:px-2.5 md:py-1 md:text-xs",
                                     on
                                         ? TYPE_META[tab].chip
                                         : "border-slate-700 text-slate-500 hover:text-slate-300",
@@ -119,6 +240,18 @@ export function RecordingsEventPanel({
                             </button>
                         );
                     })}
+                    <button
+                        type="button"
+                        onClick={() => setMotionOn((v) => !v)}
+                        className={cn(
+                            "rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors md:px-2.5 md:py-1 md:text-xs",
+                            motionOn
+                                ? MOTION_META.chip
+                                : "border-slate-700 text-slate-500 hover:text-slate-300",
+                        )}
+                    >
+                        {MOTION_META.label}
+                    </button>
                 </div>
             </div>
 
@@ -128,7 +261,7 @@ export function RecordingsEventPanel({
                 onScroll={maybeLoadMore}
                 className="min-h-0 flex-1 overflow-y-auto"
             >
-                {enabled.size === 0 ? (
+                {nothingSelected ? (
                     <p className="px-4 py-6 text-center text-xs text-slate-500">
                         Chọn ít nhất một loại sự kiện ở trên
                     </p>
@@ -143,17 +276,7 @@ export function RecordingsEventPanel({
                 ) : (
                     <>
                         <ul className="flex flex-col gap-2.5 p-3">
-                            {visible.map((item) => (
-                                <FeedRow
-                                    key={item.key}
-                                    tab={item.tab}
-                                    event={item.event}
-                                    onSeek={() => onSeek(Number(item.event.timestamp))}
-                                    onOpen={(url, label, box, boxColor) =>
-                                        setLightbox({ url, label, box, boxColor })
-                                    }
-                                />
-                            ))}
+                            {visible.map((row) => row.node)}
                         </ul>
                         <div className="px-4 pb-4 pt-1 text-center text-xs text-slate-500">
                             {loadingMore ? (

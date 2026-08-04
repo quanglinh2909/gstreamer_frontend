@@ -1,10 +1,13 @@
 import type { RecognitionEvent, RecognitionEventTab } from "@/interface/recognition-event";
 import { getEventResultLabel } from "@/lib/event-view-model";
 
-// Loại sự kiện cho các bảng feed realtime (Xem trực tiếp + Xem lại). Thêm
-// "mask" (khẩu trang) ngoài 3 loại có bảng DB của trang /events — giữ kiểu
-// riêng để không phải sửa RecognitionEventTab dùng khắp nơi.
-export type FeedTab = RecognitionEventTab | "mask";
+// Loại sự kiện cho các bảng feed realtime (Xem trực tiếp + Xem lại).
+//
+// Từng là `RecognitionEventTab | "mask"`: hồi đó khẩu trang không có bảng DB
+// nên nó chỉ tồn tại ở các bảng realtime này. Giờ nó có bảng event_mask và
+// nằm hẳn trong RecognitionEventTab, nên hai kiểu trùng nhau — giữ tên riêng
+// vì các bảng feed vẫn có thể mọc thêm loại không phải "nhận diện".
+export type FeedTab = RecognitionEventTab;
 
 export const ALL_TABS: FeedTab[] = ["face", "plate", "restricted", "mask"];
 
@@ -16,6 +19,17 @@ export const AI_TYPE_TO_TAB: Record<string, FeedTab> = {
     plate_recognition: "plate",
     restricted_area: "restricted",
     face_mask: "mask",
+};
+
+// "Chuyển động" CỐ Ý không phải một FeedTab: nó không đi qua backend Python,
+// không có bảng nhận dạng, không có ảnh/độ tin cậy, và là một KHOẢNG thời gian
+// chứ không phải một thời điểm. Nhét vào FeedTab thì `getEventSocketUrl` (có
+// nhánh mặc định về face-events) sẽ lặng lẽ mở nhầm socket, còn DetectionFilter
+// mọc thêm một loại khung mà AI không hề vẽ. Giữ riêng, gắn ở chỗ nào cần.
+export const MOTION_META = {
+    label: "Chuyển động",
+    chip: "border-violet-500 bg-violet-500/15 text-violet-300",
+    badge: "bg-violet-500/15 text-violet-300 ring-violet-500/40",
 };
 
 export function cn(...classes: Array<string | false | undefined>) {

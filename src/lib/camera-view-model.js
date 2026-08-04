@@ -106,16 +106,18 @@ function filterCameras(cameras = [], filters = {}) {
 
 function formatCameraDate(value) {
   if (!value) {
-    return "N/A";
+    return "Chưa có";
   }
 
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
-    return "N/A";
+    return "Chưa có";
   }
 
-  return date.toLocaleString(undefined, {
+  // Chốt "vi-VN" chứ không để undefined (theo máy người dùng): cả ứng dụng
+  // chỉ có tiếng Việt, và các trang khác cũng đang hiện ngày kiểu 31/07/2026.
+  return date.toLocaleString("vi-VN", {
     dateStyle: "medium",
     timeStyle: "short",
   });
@@ -153,15 +155,19 @@ function normalizeRecordingMode(value) {
   return "off";
 }
 
-function normalizeHardware(value) {
-  return asText(value) || "auto";
+// Giao diện không còn ô chọn phần cứng giải mã: mọi camera đều "auto" và
+// engine tự dò (mppvideodec → vaapi → nvdec → v4l2 → phần mềm). Trả về "auto"
+// bất kể giá trị cũ trong DB — nếu giữ lại một giá trị đã đặt tay thì nó thành
+// thiết lập vô hình, không ai sửa được nữa.
+function normalizeHardware() {
+  return "auto";
 }
 
 function getCameraFormDefaults(camera = {}) {
   return {
     name: asText(camera.name),
     rtsp: asText(camera.rtsp),
-    hardware: normalizeHardware(camera.hardware),
+    hardware: normalizeHardware(),
     recordingEnabled: Boolean(camera.recordingEnabled),
     recordingMode: normalizeRecordingMode(camera.recordingMode),
     motionEnabled: Boolean(camera.motionEnabled),
@@ -170,6 +176,9 @@ function getCameraFormDefaults(camera = {}) {
     preMotionSeconds: numberToField(camera.preMotionSeconds),
     postMotionSeconds: numberToField(camera.postMotionSeconds),
     segmentSeconds: numberToField(camera.segmentSeconds, 60),
+    // Hạn lưu KHÔNG mặc định về một con số nào: 0 = giữ vô thời hạn, và đó
+    // phải là hành vi của camera chưa ai đụng tới.
+    retentionDays: numberToField(camera.retentionDays, 0),
     motionKeyframeOnly: Boolean(camera.motionKeyframeOnly),
   };
 }
@@ -178,7 +187,7 @@ function buildCameraPayload(form) {
   return {
     name: asText(form.name),
     rtsp: asText(form.rtsp),
-    hardware: normalizeHardware(form.hardware),
+    hardware: normalizeHardware(),
     recordingEnabled: Boolean(form.recordingEnabled),
     recordingMode: normalizeRecordingMode(form.recordingMode),
     motionEnabled: Boolean(form.motionEnabled),
@@ -187,6 +196,7 @@ function buildCameraPayload(form) {
     preMotionSeconds: fieldToNumber(form.preMotionSeconds),
     postMotionSeconds: fieldToNumber(form.postMotionSeconds),
     segmentSeconds: fieldToNumber(form.segmentSeconds),
+    retentionDays: Math.max(0, Math.min(3650, fieldToNumber(form.retentionDays) || 0)),
     motionKeyframeOnly: Boolean(form.motionKeyframeOnly),
   };
 }

@@ -24,3 +24,15 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Vùng cuộn ngang mà KHÔNG hiện thanh cuộn.
+   Dùng cho các thanh công cụ trên mobile: chúng chỉ tràn vài chục pixel, mà
+   thanh cuộn của desktop-Chrome lại chiếm hẳn 15px chiều cao và trông như lỗi
+   bố cục. Cuộn bằng ngón tay vẫn hoạt động bình thường. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

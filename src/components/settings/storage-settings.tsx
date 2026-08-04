@@ -14,6 +14,8 @@ interface Policy {
     w_event_plate: number;
     w_parking_lot_event: number;
     w_restricted_area: number;
+    w_event_mask: number;
+    w_motion_event: number;
 }
 interface StatusResp {
     disk: {
@@ -33,6 +35,8 @@ const CATEGORIES: { key: keyof Policy; sizeKey: string; label: string }[] = [
     { key: "w_event_plate", sizeKey: "event_plate", label: "Sự kiện biển số" },
     { key: "w_parking_lot_event", sizeKey: "parking_lot_event", label: "Sự kiện bãi xe" },
     { key: "w_restricted_area", sizeKey: "restricted_area", label: "Vùng cấm" },
+    { key: "w_event_mask", sizeKey: "event_mask", label: "Sự kiện khẩu trang" },
+    { key: "w_motion_event", sizeKey: "motion_event", label: "Sự kiện chuyển động" },
 ];
 
 function gb(bytes: number): string {
@@ -113,8 +117,9 @@ export function StorageSettings() {
 
     return (
         <main className="h-full overflow-y-auto bg-slate-50">
-            <div className="mx-auto flex min-h-full max-w-[900px] flex-col gap-5 px-6 py-5">
-                <header>
+            <div className="mx-auto flex min-h-full max-w-[900px] flex-col gap-3 px-3 py-3 sm:gap-5 sm:px-6 sm:py-5">
+                {/* Tiêu đề đã nằm ở thanh trên của MainLayout trên điện thoại. */}
+                <header className="hidden md:block">
                     <h1 className="flex items-center gap-2 text-2xl font-semibold text-slate-950">
                         <HardDrive size={22} /> Lưu trữ & tự dọn
                     </h1>
@@ -131,8 +136,8 @@ export function StorageSettings() {
                 ) : null}
 
                 {/* Thẻ dung lượng đĩa */}
-                <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="mb-3 flex items-baseline justify-between">
+                <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-5">
+                    <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
                         <h2 className="text-sm font-semibold text-slate-800">Ổ đĩa</h2>
                         {disk ? (
                             <span className="text-sm text-slate-500">
@@ -167,7 +172,7 @@ export function StorageSettings() {
                 </section>
 
                 {/* Kích thước từng loại */}
-                <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-5">
                     <h2 className="mb-3 text-sm font-semibold text-slate-800">
                         Dung lượng đang chiếm theo loại
                     </h2>
@@ -175,15 +180,15 @@ export function StorageSettings() {
                         {CATEGORIES.map((c) => {
                             const size = status?.categories?.[c.sizeKey]?.size_bytes ?? 0;
                             return (
-                                <div key={c.sizeKey} className="flex items-center gap-3">
-                                    <span className="w-40 shrink-0 text-sm text-slate-600">{c.label}</span>
+                                <div key={c.sizeKey} className="flex items-center gap-2 sm:gap-3">
+                                    <span className="w-28 shrink-0 truncate text-xs text-slate-600 sm:w-40 sm:text-sm">{c.label}</span>
                                     <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-100">
                                         <div
                                             className="h-full rounded-full bg-slate-400"
                                             style={{ width: `${(size / maxCatBytes) * 100}%` }}
                                         />
                                     </div>
-                                    <span className="w-20 shrink-0 text-right font-mono text-xs text-slate-500">
+                                    <span className="w-16 shrink-0 text-right font-mono text-[11px] text-slate-500 sm:w-20 sm:text-xs">
                                         {gb(size)}
                                     </span>
                                 </div>
@@ -194,7 +199,7 @@ export function StorageSettings() {
 
                 {/* Cấu hình */}
                 {form ? (
-                    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-5">
                         <div className="mb-4 flex items-center justify-between">
                             <h2 className="text-sm font-semibold text-slate-800">Cấu hình tự dọn</h2>
                             <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
@@ -208,7 +213,7 @@ export function StorageSettings() {
                             </label>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
                             <label className="flex flex-col gap-1 text-sm">
                                 <span className="text-slate-600">Giữ trống tối thiểu (GB)</span>
                                 <input

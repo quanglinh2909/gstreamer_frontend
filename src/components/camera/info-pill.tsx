@@ -4,7 +4,7 @@ export function InfoPill({ label, value }: { label: string; value: string }) {
             <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500">
                 {label}
             </p>
-            <p className="mt-1 truncate text-sm font-semibold text-slate-800">{value || "N/A"}</p>
+            <p className="mt-1 truncate text-sm font-semibold text-slate-800">{value || "Chưa có"}</p>
         </div>
     );
 }

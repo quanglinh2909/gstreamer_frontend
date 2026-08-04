@@ -1,7 +1,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
-import { AlertTriangle, Bell, CalendarDays, Eye, Radio, Search, Video } from "lucide-react";
+import {
+    AlertTriangle,
+    Bell,
+    CalendarDays,
+    Eye,
+    Menu,
+    Radio,
+    Search,
+    Video,
+    X,
+    ZoomIn,
+    ZoomOut,
+} from "lucide-react";
 import { DetectionFilter } from "@/components/common/detection-filter";
+import { useMotionEventFeed } from "@/hooks/use-motion-event-feed";
+import { SpeedPicker } from "@/components/common/speed-picker";
+import {
+    DrawerBackdrop,
+    DrawerToggle,
+    drawerClass,
+} from "@/components/common/side-drawer";
 import { ALL_TABS, type FeedTab } from "@/lib/event-feed-shared";
 import type { ICameraResponse } from "@/interface/camera";
 import { WebRtcPlayer } from "@/components/common/webrtc-player";
@@ -13,11 +32,17 @@ import {
     type RecordingSegment,
 } from "@/lib/recordings";
 import { PlaybackVideo, type PlaybackVideoHandle } from "./playback-video";
-import { Timeline, type TimelineAiEvent } from "./timeline";
+import { MAX_SPAN, MIN_SPAN, Timeline, type TimelineAiEvent } from "./timeline";
 import { RecordingsEventPanel } from "./event-feed-panel";
 import { useCameraEventFeed } from "@/hooks/use-camera-event-feed";
 import { useLiveViewers } from "@/hooks/use-live-viewers";
 import { RegionSearchLayer, RegionSearchPanel, useRegionSearch } from "./region-search";
+import { useAppMenuStore } from "@/stores/use-app-menu-store";
+
+// Giữ ô của một KHUNG trên hình bấy nhiêu lâu. Engine bắn 5 khung/giây khi có
+// động; hết động là không còn gói nào, nên phải tự hết hạn — không thì ô cuối
+// cùng nằm lì trên hình và người xem tưởng vẫn đang có chuyển động.
+const MOTION_FRAME_HOLD_MS = 1_200;
 
 const DEFAULT_SPAN = 6 * 3_600_000;
 
@@ -39,19 +64,33 @@ function liveWindow(nowMs: number, span: number): [number, number] {
 export function RecordingsView({
     cameras,
     eventWsOrigin = "",
+    engineWsOrigin = "",
 }: {
     cameras: ICameraResponse[];
+    // Backend PYTHON (/ws): sự kiện nhận diện.
     eventWsOrigin?: string;
+    // ENGINE C++ (/wsc): sự kiện CHUYỂN ĐỘNG (motioncells chạy trong engine).
+    engineWsOrigin?: string;
 }) {
     const router = useRouter();
     const [selectedId, setSelectedId] = useState<string | null>(null);
-    // Bảng sự kiện bên phải (đóng/mở bằng nút chuông).
+    const toggleAppMenu = useAppMenuStore((state) => state.toggle);
+    // Bảng sự kiện: MỞ SẴN ở mọi khổ màn. Trên mobile nó không phủ lên video nữa
+    // mà nằm ngay dưới, nên mở sẵn là đúng — vào trang thấy luôn hình và dòng
+    // sự kiện, không phải đi tìm nút bật.
     const [eventsPanelOpen, setEventsPanelOpen] = useState(true);
+    // Ngăn kéo danh sách camera — chỉ có tác dụng dưới md, xem side-drawer.tsx.
+    const [camListOpen, setCamListOpen] = useState(false);
     // Vẽ khung phát hiện AI đè lên hình trực tiếp + lọc theo loại. MẶC ĐỊNH
     // TẮT: lớp phủ che mất hình, ai cần thì tự bật.
     const [showBoxes, setShowBoxes] = useState(false);
     const [boxTypes, setBoxTypes] = useState<Set<FeedTab>>(() => new Set(ALL_TABS));
     const [showZones, setShowZones] = useState(true);
+    // Vẽ ô đã động lên hình. Riêng khỏi `boxTypes` vì chuyển động không phải một
+    // FeedTab — engine tự dò, không đi qua AI. Mặc định BẬT như mọi loại khung
+    // khác (boxTypes khởi tạo bằng ALL_TABS): bật "Khung AI" là thấy đủ mọi thứ
+    // đang được vẽ, không phải đi tìm thêm một công tắc nữa.
+    const [showMotionCells, setShowMotionCells] = useState(true);
     // Chế độ khoanh vùng trên hình để tìm sự kiện đã đi qua vùng đó.
     const [regionSearch, setRegionSearch] = useState(false);
     // Thông báo thoáng qua (bấm sự kiện không có bản ghi…).
@@ -94,8 +133,55 @@ export function RecordingsView({
         [feed.events],
     );
 
+    // Ô chuyển động cho lớp phủ. Hai chế độ, hai nguồn khác hẳn nhau:
+    //   live     -> WebSocket của engine, giữ lại vài giây sau khi sự kiện đóng
+    //   playback -> tra trong danh sách sự kiện CỦA NGÀY (trang đã tải sẵn cho
+    //               timeline) xem mốc đang phát rơi vào sự kiện nào
+    const motionOverlayOn = showBoxes && showMotionCells && mode === "live";
+    const frameCameras = useMemo(
+        () => (motionOverlayOn && selectedId ? [selectedId] : []),
+        [motionOverlayOn, selectedId],
+    );
+    const liveMotionOverlay = useMotionEventFeed(
+        engineWsOrigin,
+        motionOverlayOn,
+        selectedId,
+        frameCameras,
+    );
+    const motionOverlay = useMemo(() => {
+        if (!showBoxes || !showMotionCells) return null;
+        if (mode === "live") {
+            // KHUNG realtime (5 gói/giây) là nguồn chính: thấy động là thấy
+            // ngay, kể cả chỗ động ngoài vùng (vẽ đỏ) và cả những đợt động nhỏ
+            // chưa đủ ngưỡng sinh sự kiện.
+            const frame = selectedId ? liveMotionOverlay.frames[selectedId] : undefined;
+            if (frame && now - frame.atMs <= MOTION_FRAME_HOLD_MS) {
+                return {
+                    cells: frame.inside,
+                    outside: frame.outside,
+                    gridX: frame.gridX,
+                    gridY: frame.gridY,
+                };
+            }
+            return null;
+        }
+        // Xem lại: sự kiện CHỨA mốc đang phát. Không lấy "gần nhất" — tua tới
+        // chỗ không có chuyển động mà vẫn vẽ ô là nói dối người xem.
+        const hit = motion.find((m) => m.startMs <= playMs && playMs <= m.endMs);
+        if (!hit || !hit.cells) return null;
+        return { cells: hit.cells, gridX: hit.gridX || 32, gridY: hit.gridY || 32 };
+    }, [
+        showBoxes,
+        showMotionCells,
+        mode,
+        selectedId,
+        liveMotionOverlay.frames,
+        now,
+        motion,
+        playMs,
+    ]);
+
     const playerRef = useRef<PlaybackVideoHandle>(null);
-    const dateInputRef = useRef<HTMLInputElement>(null);
     const segmentsRef = useRef<RecordingSegment[]>([]);
     segmentsRef.current = segments;
     const playRef = useRef(playMs);
@@ -346,6 +432,26 @@ export function RecordingsView({
         setPlayMs(wallMs);
     }, []);
 
+    // Phóng/thu khung timeline. Ở cấp TRANG chứ không trong Timeline nữa: nút
+    // bấm giờ nổi trên video (khổ điện thoại), tức khác hẳn nhánh cây với thanh
+    // timeline. Neo vào GIỮA khung — chạm không có vị trí con trỏ thường trực.
+    const zoomTimeline = useCallback((factor: number) => {
+        setWindow(([start, end]) => {
+            const span = Math.max(MIN_SPAN, end - start);
+            const centre = start + span / 2;
+            const next = Math.min(MAX_SPAN, Math.max(MIN_SPAN, span * factor));
+            let s = centre - next / 2;
+            let e = centre + next / 2;
+            // Không cho khung trôi quá "bây giờ" — giống clampWindow của Timeline.
+            const maxEnd = Date.now();
+            if (e > maxEnd) {
+                e = maxEnd;
+                s = maxEnd - next;
+            }
+            return [s, e];
+        });
+    }, []);
+
     const goLive = useCallback(() => {
         setMode("live");
         setDayMs(startOfDay(Date.now()));
@@ -366,32 +472,35 @@ export function RecordingsView({
         }
     }, []);
 
-    // Nghe sự kiện 'change' GỐC của trình duyệt trên input date, KHÔNG dùng
-    // onChange của React: React nuốt onChange khi giá trị trùng bộ-theo-dõi của
-    // nó (chọn LẠI đúng ngày đang chọn), khiến không snap khung về được. Nút mở
-    // lịch xoá tạm value="" nên chọn cùng ngày vẫn làm DOM đổi -> 'change' bắn.
-    // selectedId trong deps: input date chỉ render sau khi đã chọn camera; hiệu
-    // ứng phải chạy LẠI lúc đó để gắn listener (lần đầu ref còn null).
-    useEffect(() => {
-        const el = dateInputRef.current;
-        if (!el) return;
-        const onNative = () => { if (el.value) pickDay(el.value); };
-        el.addEventListener("change", onNative);
-        return () => el.removeEventListener("change", onNative);
-    }, [pickDay, selectedId]);
 
     const selected = cameras.find((c) => c.id === selectedId) ?? null;
     const playhead = mode === "live" ? now : playMs;
 
     return (
-        <div className="flex h-full min-h-0 bg-slate-950 text-slate-100">
-            {/* Danh sách camera */}
-            <aside className="flex w-64 shrink-0 flex-col border-r border-slate-800">
-                <div className="border-b border-slate-800 px-4 py-3">
-                    <h1 className="text-sm font-semibold">Xem lại</h1>
-                    <p className="mt-0.5 text-xs text-slate-500">
-                        Live mặc định · bấm timeline để xem bản ghi
-                    </p>
+        <div className="flex h-full min-h-0 flex-col bg-slate-950 text-slate-100 md:flex-row">
+            {/* Danh sách camera — ngăn kéo trên mobile, cột từ md. */}
+            <DrawerBackdrop open={camListOpen} onClose={() => setCamListOpen(false)} />
+            <aside
+                className={
+                    "flex flex-col border-r border-slate-800 bg-slate-950 md:shrink-0 " +
+                    drawerClass("left", camListOpen, "md:w-64")
+                }
+            >
+                <div className="flex items-start gap-2 border-b border-slate-800 px-4 py-3">
+                    <div className="min-w-0 flex-1">
+                        <h1 className="text-sm font-semibold">Xem lại</h1>
+                        <p className="mt-0.5 text-xs text-slate-500">
+                            Live mặc định · bấm timeline để xem bản ghi
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setCamListOpen(false)}
+                        aria-label="Đóng danh sách camera"
+                        className="-mr-1 -mt-1 shrink-0 rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-slate-100 md:hidden"
+                    >
+                        <X size={18} aria-hidden="true" />
+                    </button>
                 </div>
                 <div className="min-h-0 flex-1 overflow-y-auto py-1">
                     {cameras.length === 0 ? (
@@ -403,6 +512,8 @@ export function RecordingsView({
                                 type="button"
                                 onClick={() => {
                                     pickCamera(cam.id);
+                                    // Ngăn kéo che hết khung xem trên mobile.
+                                    setCamListOpen(false);
                                     setMode("live");
                                     setDayMs(startOfDay(Date.now()));
                                     setWindow(([s, e]) => liveWindow(Date.now(), e - s));
@@ -438,44 +549,100 @@ export function RecordingsView({
             </aside>
 
             {/* Player + timeline */}
-            <div className="flex min-w-0 flex-1 flex-col">
-                {!selectedId ? (
-                    <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
-                        Chọn một camera bên trái để xem
-                    </div>
-                ) : (
-                    <>
-                        <div className="flex shrink-0 items-center gap-3 border-b border-slate-800 px-4 py-2">
-                            <span className="truncate text-sm font-semibold">
-                                {selected?.name || selectedId}
-                            </span>
+            {/* shrink-0 trên mobile: cụm video+timeline lấy đúng chiều cao
+                nó cần, phần còn lại nhường hết cho bảng sự kiện bên dưới. */}
+            <div className="flex min-w-0 shrink-0 flex-col md:flex-1">
+                {/* MỘT thanh duy nhất trên mobile: nút mở ngăn kéo + tên
+                    camera + toàn bộ nút điều khiển. Trước đây là HAI hàng chồng
+                    nhau, mà hàng trên gần như trống — 44px đó trên màn điện
+                    thoại là bằng hai dòng sự kiện.
+
+                    Dựng NGOÀI nhánh điều kiện bên dưới: lúc chưa chọn camera
+                    nào mà thanh này không tồn tại thì không còn cách nào mở
+                    được danh sách camera. */}
+                <div className="flex shrink-0 items-center gap-2 border-b border-slate-800 px-3 py-2 md:gap-3 md:px-4">
+                    {/* Menu ỨNG DỤNG — trang này tắt thanh ngang của MainLayout
+                        để khỏi tốn thêm 44px chiều cao. */}
+                    <DrawerToggle label="Mở menu" onClick={toggleAppMenu}>
+                        <Menu size={16} aria-hidden="true" />
+                    </DrawerToggle>
+                    <DrawerToggle
+                        label="Danh sách camera"
+                        onClick={() => setCamListOpen(true)}
+                    >
+                        <Video size={16} aria-hidden="true" />
+                    </DrawerToggle>
+                    {/* flex-1 + min-w-0: tên dài thì tự cắt bớt, KHÔNG đẩy cụm
+                        nút bên phải ra khỏi thanh. */}
+                    <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+                        {selected?.name || "Xem lại"}
+                    </span>
+                    {selectedId ? (
+                        <>
+                            {/* Badge trạng thái: chỉ từ md. Dưới md nút LIVE đã
+                                nằm ngay trên thanh này và tự báo trạng thái bằng
+                                màu (xanh = đang xem trực tiếp), giữ thêm badge
+                                nữa là nói hai lần cùng một chuyện. */}
                             {mode === "live" ? (
-                                <span className="flex items-center gap-1 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-300">
+                                <span className="hidden items-center gap-1 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-300 md:flex">
                                     <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
                                     LIVE
                                 </span>
                             ) : (
-                                <span className="rounded bg-slate-700/50 px-1.5 py-0.5 text-[11px] font-semibold text-slate-300">
+                                <span className="hidden rounded bg-slate-700/50 px-1.5 py-0.5 text-[11px] font-semibold text-slate-300 md:inline">
                                     XEM LẠI
                                 </span>
                             )}
                             {/* Khung AI chỉ có nghĩa khi đang xem trực tiếp —
                                 xem lại là đọc file, AI không chạy trên đó. */}
+                            {/* LIVE + chọn ngày — dưới md thì nằm ở ĐÂY chứ không
+                                ở hàng dưới timeline, để hàng đó chỉ còn hai nút
+                                phóng và trả chiều cao lại cho bảng sự kiện. */}
+                            <div className="flex shrink-0 items-center gap-2 md:hidden">
+                                <PlaybackControls
+                                    compact
+                                    isLive={mode === "live"}
+                                    dayMs={dayMs}
+                                    onGoLive={goLive}
+                                    onPickDay={pickDay}
+                                />
+                            </div>
+                            {/* Tìm theo vùng = kéo chuột khoanh vùng trên hình,
+                                thao tác này không dùng được bằng ngón tay nên ẩn
+                                hẳn dưới md thay vì để một nút bấm vào không ra gì. */}
                             <button
                                 type="button"
                                 onClick={() => setRegionSearch((v) => !v)}
                                 title="Khoanh một vùng trên hình để tìm sự kiện đã đi qua đó"
                                 className={
-                                    "ml-auto inline-flex items-center gap-1.5 rounded border px-2 py-1 text-xs font-medium transition-colors " +
+                                    "hidden shrink-0 items-center gap-1.5 rounded border px-2 py-1 text-xs font-medium transition-colors md:inline-flex " +
                                     (regionSearch
                                         ? "border-sky-500 bg-sky-500/15 text-sky-300"
                                         : "border-slate-600 text-slate-300 hover:border-slate-500 hover:text-slate-100")
                                 }
                             >
                                 <Search size={13} />
-                                Tìm theo vùng
+                                {/* Chữ chỉ hiện từ sm: bốn nút kèm chữ không
+                                    vừa một hàng 390px, mà cuộn ngang thanh
+                                    công cụ thì nút cuối luôn bị khuất. */}
+                                <span className="hidden sm:inline">Tìm theo vùng</span>
                             </button>
-                            <div>
+                            {/* compact (chỉ icon) ở khổ hẹp — bản có chữ
+                                "Khung AI" rộng gấp đôi. */}
+                            <div className="shrink-0 sm:hidden">
+                                <DetectionFilter
+                                    compact
+                                    enabled={showBoxes}
+                                    onEnabledChange={setShowBoxes}
+                                    types={boxTypes}
+                                    onTypesChange={setBoxTypes}
+                                    zonesVisible={showZones}
+                                    onZonesVisibleChange={setShowZones}
+                                    motionVisible={showMotionCells}
+                                    onMotionVisibleChange={setShowMotionCells}
+                                />
+                            </div>
+                            <div className="hidden shrink-0 sm:block">
                                 <DetectionFilter
                                     enabled={showBoxes}
                                     onEnabledChange={setShowBoxes}
@@ -483,6 +650,8 @@ export function RecordingsView({
                                     onTypesChange={setBoxTypes}
                                     zonesVisible={showZones}
                                     onZonesVisibleChange={setShowZones}
+                                    motionVisible={showMotionCells}
+                                    onMotionVisibleChange={setShowMotionCells}
                                 />
                             </div>
                             <button
@@ -499,18 +668,48 @@ export function RecordingsView({
                                           : "Hiện bảng sự kiện"
                                 }
                                 className={
-                                    "inline-flex items-center gap-1.5 rounded border px-2 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 " +
+                                    "hidden shrink-0 items-center gap-1.5 rounded border px-2 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 md:inline-flex " +
                                     (eventsPanelOpen && !regionSearch
                                         ? "border-sky-500 bg-sky-500/15 text-sky-300"
                                         : "border-slate-600 text-slate-300 hover:border-slate-500 hover:text-slate-100")
                                 }
                             >
                                 <Bell size={13} />
-                                Sự kiện
+                                <span className="hidden sm:inline">Sự kiện</span>
                             </button>
-                        </div>
+                        </>
+                    ) : null}
+                </div>
 
-                        <div className="relative min-h-0 flex-1 bg-black p-2">
+                {!selectedId ? (
+                    // min-h trên mobile: cột cha là shrink-0 nên flex-1 ở đây
+                    // không có chiều cao nào để căn giữa, chữ bị cắt cụt sát
+                    // mép thanh công cụ.
+                    <div className="flex min-h-[50vh] flex-1 flex-col items-center justify-center gap-3 px-6 text-center text-sm text-slate-500 md:min-h-0">
+                        <span>Chọn một camera để xem</span>
+                        {/* Trên mobile danh sách nằm trong ngăn kéo — không có
+                            nút này thì chỉ còn cái icon nhỏ trên thanh, người
+                            dùng lần đầu rất dễ đứng nhìn màn hình trống. */}
+                        <button
+                            type="button"
+                            onClick={() => setCamListOpen(true)}
+                            className="inline-flex items-center gap-2 rounded-lg border border-slate-600 px-3 py-2 text-xs font-semibold text-slate-200 md:hidden"
+                        >
+                            <Video size={14} aria-hidden="true" />
+                            Mở danh sách camera
+                        </button>
+                    </div>
+                ) : (
+                    <>
+
+                        {/* 16:9 cố định trên mobile (đúng tỉ lệ khung camera, không thừa
+                            dải đen); từ md mới giãn theo chỗ trống như cũ. */}
+                        {/* Chiều cao video trên mobile = nhỏ hơn của (16:9 theo bề ngang) và
+                            (34% chiều cao màn). Chốt trần theo vh là để trên máy màn
+                            thấp / Safari hiện thanh dưới, video không nuốt hết chỗ và
+                            đẩy bảng sự kiện ra ngoài khung nhìn. Player fit="contain"
+                            nên thừa chỗ chỉ ra dải đen, không méo hình. */}
+                        <div className="relative h-[min(56.25vw,34vh)] w-full shrink-0 bg-black md:h-auto md:min-h-0 md:flex-1 md:p-2">
                             {/* Thông báo thoáng qua. Đặt trên video, z cao hơn
                                 cả lớp tìm-theo-vùng để không bị che. */}
                             {notice ? (
@@ -531,6 +730,7 @@ export function RecordingsView({
                                     showDetections={showBoxes}
                                     detectionTypes={boxTypes}
                                     detectionZonesVisible={showZones}
+                                    motionCells={motionOverlay}
                                 />
                             ) : (
                                 <PlaybackVideo
@@ -545,8 +745,46 @@ export function RecordingsView({
                                     onPosition={handlePosition}
                                     showDetections={showBoxes}
                                     detectionTypes={boxTypes}
+                                    motionCells={motionOverlay}
                                 />
                             )}
+
+                            {/* Nút phóng NỔI trên video (chỉ mobile): trước đây
+                                chúng chiếm một hàng riêng phía trên timeline, mà
+                                hàng đó chỉ có hai cái nút — 36px lấy mất của
+                                bảng sự kiện. Góc dưới-trái để không đè lên dấu
+                                thời gian OSD (góc trên-phải) của camera. */}
+                            <div className="absolute inset-x-2 bottom-2 z-20 flex items-center gap-1.5 md:hidden">
+                                <button
+                                    type="button"
+                                    onClick={() => zoomTimeline(1 / 2)}
+                                    aria-label="Phóng to khung thời gian"
+                                    className="flex h-8 w-8 items-center justify-center rounded-md border border-white/20 bg-slate-950/60 text-slate-100 backdrop-blur-sm"
+                                >
+                                    <ZoomIn size={15} aria-hidden="true" />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => zoomTimeline(2)}
+                                    aria-label="Thu nhỏ khung thời gian"
+                                    className="flex h-8 w-8 items-center justify-center rounded-md border border-white/20 bg-slate-950/60 text-slate-100 backdrop-blur-sm"
+                                >
+                                    <ZoomOut size={15} aria-hidden="true" />
+                                </button>
+                                {/* Tua nhanh — chỉ ở chế độ XEM LẠI (live thì
+                                    không có tốc độ nào để đổi). Đặt ở đây vì
+                                    bản gốc nằm trong lớp điều khiển của
+                                    PlaybackVideo, mà lớp đó hiện ra bằng
+                                    group-hover — màn cảm ứng không có hover nên
+                                    trên điện thoại nó không bao giờ bung ra. */}
+                                {mode === "playback" ? (
+                                    <SpeedPicker
+                                        value={speed}
+                                        onChange={setSpeed}
+                                        className="ml-auto"
+                                    />
+                                ) : null}
+                            </div>
 
                             {regionSearch ? (
                                 <RegionSearchLayer
@@ -560,7 +798,7 @@ export function RecordingsView({
                         </div>
 
                         {/* Timeline + cụm điều khiển bên phải (LIVE, chọn ngày) */}
-                        <div className="flex shrink-0 items-stretch gap-3 border-t border-slate-800 bg-slate-950 px-4 pb-3 pt-8">
+                        <div className="flex shrink-0 flex-col items-stretch gap-2 border-t border-slate-800 bg-slate-950 px-3 pb-1.5 pt-2 md:flex-row md:gap-3 md:px-4 md:pb-3 md:pt-8">
                             <div className="min-w-0 flex-1">
                                 <Timeline
                                     windowStart={window_[0]}
@@ -575,65 +813,19 @@ export function RecordingsView({
                                     isLive={mode === "live"}
                                     onSeek={handleSeek}
                                     onWindowChange={(s, e) => setWindow([s, e])}
+                                    showMobileZoom={false}
                                 />
                             </div>
-                            {/* justify-center + mb-6: căn cụm nút vào giữa phần
-                                THÂN timeline (trừ hàng chú thích dưới cùng),
-                                không bị tụt lệch so với các dải. */}
-                            <div className="mb-6 flex w-32 shrink-0 flex-col justify-center gap-2 border-l border-slate-800 pl-3 mt-[15px]">
-                                <button
-                                    type="button"
-                                    onClick={goLive}
-                                    className={
-                                        "flex items-center justify-center gap-1.5 rounded border px-2 py-1.5 text-xs font-semibold transition-colors " +
-                                        (mode === "live"
-                                            ? "border-emerald-500 bg-emerald-500/15 text-emerald-300"
-                                            : "border-slate-600 text-slate-300 hover:border-emerald-500/60 hover:text-emerald-300")
-                                    }
-                                >
-                                    <Radio size={13} />
-                                    LIVE
-                                </button>
-                                {/* Nút hiển thị ngày: bấm là bung lịch, KHÔNG
-                                    "bôi chọn" từng số như input date gốc. Input
-                                    date thật ẩn phía sau, chỉ giữ giá trị + mở
-                                    picker qua showPicker(). */}
-                                <div className="relative">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const el = dateInputRef.current;
-                                            if (!el) return;
-                                            // Đồng bộ value theo ngày ĐANG CHỌN để lịch
-                                            // bật lên tô đúng ngày đó (input uncontrolled
-                                            // nên phải set tay). Chọn ngày KHÁC -> 'change'
-                                            // bắn -> pickDay. Chọn lại đúng ngày này thì
-                                            // là no-op (đằng nào cũng đang ở ngày đó).
-                                            el.value = toDateInputValue(dayMs);
-                                            if (el.showPicker) el.showPicker();
-                                            else el.focus();
-                                        }}
-                                        className="flex w-full items-center justify-between gap-2 rounded border border-slate-600 bg-slate-900 px-2 py-2 text-xs text-slate-200 transition-colors hover:border-slate-500"
-                                    >
-                                        <span className="font-mono">
-                                            {new Date(dayMs).toLocaleDateString("vi-VN")}
-                                        </span>
-                                        <CalendarDays size={14} className="shrink-0 text-slate-400" />
-                                    </button>
-                                    <input
-                                        ref={dateInputRef}
-                                        type="date"
-                                        defaultValue={toDateInputValue(dayMs)}
-                                        max={toDateInputValue(Date.now())}
-                                        // Không controlled, không onChange của React —
-                                        // xem useEffect nghe 'change' gốc ở trên.
-                                        // Ẩn hoàn toàn nhưng vẫn trong layout để
-                                        // showPicker() neo lịch đúng vị trí nút.
-                                        className="pointer-events-none absolute inset-0 h-full w-full opacity-0 [color-scheme:dark]"
-                                        tabIndex={-1}
-                                        aria-hidden="true"
-                                    />
-                                </div>
+                            {/* Desktop giữ nguyên cột phải; mobile thì cụm này
+                                đã được nhét vào hàng điều khiển của timeline
+                                (prop `controls`) nên ẩn đi để khỏi lặp. */}
+                            <div className="mb-6 mt-[15px] hidden w-32 shrink-0 flex-col justify-center gap-2 border-l border-slate-800 pl-3 md:flex">
+                                <PlaybackControls
+                                    isLive={mode === "live"}
+                                    dayMs={dayMs}
+                                    onGoLive={goLive}
+                                    onPickDay={pickDay}
+                                />
                             </div>
                         </div>
                     </>
@@ -659,11 +851,123 @@ export function RecordingsView({
                    đã lọc theo camera ở backend nên chỉ nhận đúng camera này. */
                 <RecordingsEventPanel
                     feed={feed}
+                    cameraId={selectedId}
                     cameraLabel={selected?.name || selectedId}
+                    // Chuyển động của ngày đang chọn — trang đã tải sẵn cho
+                    // timeline, panel dùng lại chứ không gọi lại endpoint.
+                    motionEvents={motion}
+                    motionOrigin={engineWsOrigin}
                     onSeek={seekToEvent}
                     onClose={() => setEventsPanelOpen(false)}
                 />
             ) : null}
         </div>
+    );
+}
+
+/**
+ * Cụm "về LIVE" + "chọn ngày".
+ *
+ * Là component RIÊNG vì nó được dựng ở HAI chỗ: cột phải của timeline (desktop)
+ * và hàng điều khiển trong timeline (mobile). Mỗi bản tự giữ ref + listener của
+ * input date, nếu dùng chung một ref ở cấp trang thì bản dựng sau ghi đè ref của
+ * bản trước và nút mở lịch của bản kia bấm không lên gì.
+ */
+function PlaybackControls({
+    isLive,
+    dayMs,
+    onGoLive,
+    onPickDay,
+    compact = false,
+}: {
+    isLive: boolean;
+    dayMs: number;
+    onGoLive: () => void;
+    onPickDay: (value: string) => void;
+    compact?: boolean;
+}) {
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    // Giữ value của input khớp ngày đang chọn. Trước đây việc này làm trong
+    // onClick của nút, nhưng dưới md cú chạm đi thẳng vào input nên onClick
+    // không chạy — thiếu chỗ này thì lịch bung ra tô sai ngày.
+    useEffect(() => {
+        if (inputRef.current) inputRef.current.value = toDateInputValue(dayMs);
+    }, [dayMs]);
+
+    // Nghe 'change' GỐC của trình duyệt chứ KHÔNG dùng onChange của React:
+    // React nuốt onChange khi giá trị trùng bộ-theo-dõi của nó (chọn LẠI đúng
+    // ngày đang chọn), khiến không snap khung về được.
+    useEffect(() => {
+        const el = inputRef.current;
+        if (!el) return;
+        const onNative = () => {
+            if (el.value) onPickDay(el.value);
+        };
+        el.addEventListener("change", onNative);
+        return () => el.removeEventListener("change", onNative);
+    }, [onPickDay]);
+
+    return (
+        <>
+            <button
+                type="button"
+                onClick={onGoLive}
+                className={
+                    "flex shrink-0 items-center justify-center gap-1.5 rounded border text-xs font-semibold transition-colors " +
+                    (compact ? "px-2 py-1 " : "px-2 py-1.5 ") +
+                    (isLive
+                        ? "border-emerald-500 bg-emerald-500/15 text-emerald-300"
+                        : "border-slate-600 text-slate-300 hover:border-emerald-500/60 hover:text-emerald-300")
+                }
+            >
+                <Radio size={13} />
+                LIVE
+            </button>
+            {/* Bấm là bung lịch, KHÔNG "bôi chọn" từng số như input date gốc:
+                input thật ẩn phía sau, chỉ giữ giá trị + mở picker. */}
+            <div className="relative">
+                <button
+                    type="button"
+                    onClick={() => {
+                        const el = inputRef.current;
+                        if (!el) return;
+                        // Đồng bộ value theo ngày ĐANG CHỌN để lịch bật lên tô
+                        // đúng ngày đó (input uncontrolled nên phải set tay).
+                        el.value = toDateInputValue(dayMs);
+                        if (el.showPicker) el.showPicker();
+                        else el.focus();
+                    }}
+                    className={
+                        "flex items-center justify-between gap-2 rounded border border-slate-600 bg-slate-900 text-xs text-slate-200 transition-colors hover:border-slate-500 " +
+                        // compact = nằm trên thanh công cụ hẹp: bỏ w-full (nó
+                        // kéo nút giãn hết chỗ còn lại) và bớt padding.
+                        (compact ? "px-2 py-1" : "w-full px-2 py-2")
+                    }
+                >
+                    <span className="font-mono">
+                        {new Date(dayMs).toLocaleDateString("vi-VN")}
+                    </span>
+                    <CalendarDays size={14} className="shrink-0 text-slate-400" />
+                </button>
+                <input
+                    ref={inputRef}
+                    type="date"
+                    defaultValue={toDateInputValue(dayMs)}
+                    max={toDateInputValue(Date.now())}
+                    // Ẩn hoàn toàn nhưng vẫn trong layout để showPicker() neo
+                    // lịch đúng vị trí nút.
+                    //
+                    // pointer-events CHỈ tắt từ md: trên iOS Safari, gọi
+                    // showPicker() vào một input đang ẩn thì lịch không bung —
+                    // bấm nút chọn ngày chẳng ra gì. Dưới md để input trong suốt
+                    // NHẬN thẳng cú chạm (nó phủ đúng lên nút), trình duyệt tự
+                    // mở bánh xe chọn ngày như với mọi input date bình thường.
+                    className="absolute inset-0 h-full w-full opacity-0 [color-scheme:dark] md:pointer-events-none"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                />
+            </div>
+        </>
     );
 }

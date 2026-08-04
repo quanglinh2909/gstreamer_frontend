@@ -88,8 +88,11 @@ export function IdentityDetailModal({
                 ) : null}
 
                 <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_360px] lg:overflow-hidden">
-                    <div className="flex items-center justify-center bg-slate-50 p-5 lg:overflow-y-auto">
-                        <div className="relative aspect-[4/5] w-full max-w-sm overflow-hidden rounded-xl border border-slate-200 bg-slate-900 shadow-sm">
+                    <div className="flex items-center justify-center bg-slate-50 p-3 sm:p-5 lg:overflow-y-auto">
+                        {/* Điện thoại: khoá theo CHIỀU CAO màn hình (30vh) thay vì
+                            tỷ lệ 4/5 — ảnh dọc rộng hết bề ngang thì cao gần 500px,
+                            đẩy danh sách biển số xuống dưới nút Sửa/Xóa. */}
+                        <div className="relative h-[30vh] w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-900 shadow-sm lg:h-auto lg:aspect-[4/5] lg:max-w-sm">
                             <IdentityImage
                                 key={imagePath}
                                 path={imagePath}

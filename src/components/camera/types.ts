@@ -13,6 +13,7 @@ export type CameraFormState = Omit<
     | "preMotionSeconds"
     | "postMotionSeconds"
     | "segmentSeconds"
+    | "retentionDays"
 > & {
     recordingMode: RecordingMode;
     motionSensitivity: string;
@@ -20,6 +21,7 @@ export type CameraFormState = Omit<
     preMotionSeconds: string;
     postMotionSeconds: string;
     segmentSeconds: string;
+    retentionDays: string;
 };
 
 export type UpdateCameraForm = <K extends keyof CameraFormState>(

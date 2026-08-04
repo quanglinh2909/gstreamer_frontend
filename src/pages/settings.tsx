@@ -3,7 +3,7 @@ import { StorageSettings } from "@/components/settings/storage-settings";
 
 export default function SettingsPage() {
     return (
-        <MainLayout>
+        <MainLayout title="Lưu trữ & tự dọn">
             <StorageSettings />
         </MainLayout>
     );

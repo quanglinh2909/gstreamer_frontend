@@ -18,14 +18,14 @@ export function DeleteCameraModal({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-sm">
             <div className="w-full max-w-md rounded-lg bg-white shadow-2xl">
                 <div className="border-b border-slate-200 px-5 py-4">
-                    <p className="text-sm font-semibold text-rose-600">Delete camera</p>
+                    <p className="text-sm font-semibold text-rose-600">Xóa camera</p>
                     <h2 className="mt-1 text-lg font-semibold text-slate-950">
-                        {camera.name || "Unnamed camera"}
+                        {camera.name || "Camera chưa đặt tên"}
                     </h2>
                 </div>
                 <div className="space-y-4 px-5 py-5">
                     <p className="text-sm text-slate-600">
-                        This camera will be removed from the list.
+                        Camera này sẽ bị gỡ khỏi danh sách.
                     </p>
                     {errorMessage ? (
                         <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
@@ -39,7 +39,7 @@ export function DeleteCameraModal({
                         onClick={onClose}
                         className="h-10 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100"
                     >
-                        Cancel
+                        Hủy
                     </button>
                     <button
                         type="button"
@@ -52,7 +52,7 @@ export function DeleteCameraModal({
                         ) : (
                             <Trash2 size={16} aria-hidden="true" />
                         )}
-                        Delete
+                        Xóa
                     </button>
                 </div>
             </div>

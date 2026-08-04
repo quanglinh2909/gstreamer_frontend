@@ -19,6 +19,12 @@ export interface PlateWhiteListSettings {
     min_plate_length: number;
     // Độ dài xung mở barrier (giây).
     barrier_duration: number;
+    // CỤM CỔNG mà camera thuộc về (tab "Cụm cổng"), null = đứng riêng.
+    //
+    // KHI THUỘC CỤM, `pre_time` ở trên KHÔNG còn tác dụng: thời gian chờ lấy
+    // của cụm. Dùng cho làn vừa vào vừa ra — xe qua camera 1 mở cổng, chạy
+    // tiếp qua camera 2 lại mở lần nữa nên barrier không kịp đóng.
+    gate_group_id: number | null;
 }
 
 export type PlateWhiteListSettingsPayload = Omit<PlateWhiteListSettings, "camera_id">;
