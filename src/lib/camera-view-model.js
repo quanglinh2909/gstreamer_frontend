@@ -179,7 +179,6 @@ function getCameraFormDefaults(camera = {}) {
     // Hạn lưu KHÔNG mặc định về một con số nào: 0 = giữ vô thời hạn, và đó
     // phải là hành vi của camera chưa ai đụng tới.
     retentionDays: numberToField(camera.retentionDays, 0),
-    motionKeyframeOnly: Boolean(camera.motionKeyframeOnly),
   };
 }
 
@@ -197,7 +196,6 @@ function buildCameraPayload(form) {
     postMotionSeconds: fieldToNumber(form.postMotionSeconds),
     segmentSeconds: fieldToNumber(form.segmentSeconds),
     retentionDays: Math.max(0, Math.min(3650, fieldToNumber(form.retentionDays) || 0)),
-    motionKeyframeOnly: Boolean(form.motionKeyframeOnly),
   };
 }
 

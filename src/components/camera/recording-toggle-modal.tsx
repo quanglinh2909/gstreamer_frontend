@@ -91,10 +91,29 @@ export function RecordingToggleModal({
                     {isEventOnly && turnOn ? (
                         <>
                             <p className="text-sm text-slate-600">
-                                Camera chỉ giữ lại đoạn có chuyển động hoặc có sự kiện AI
-                                (khuôn mặt, biển số, vùng cấm, khẩu trang). Những đoạn không
-                                có gì xảy ra bị xoá ngay khi đóng.
+                                Camera chỉ giữ lại đoạn có <b>sự kiện AI</b> (khuôn mặt, biển
+                                số, vùng cấm, khẩu trang). Những đoạn không có gì xảy ra bị
+                                xoá ngay khi đóng.
                             </p>
+                            {/* Cảnh báo ĐÚNG trạng thái đang có, không phải lời
+                                nhắc chung chung: bật cổng này mà không có nguồn
+                                sự kiện nào thì camera không giữ được đoạn nào —
+                                im lặng thì người dùng tưởng đang ghi. */}
+                            {!camera.motionEnabled ? (
+                                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+                                    Camera này <b>chưa bật phát hiện chuyển động</b>, nên chỉ
+                                    sự kiện AI mới giữ được đoạn ghi. Nếu camera cũng chưa có
+                                    AI nào đang bật thì nó sẽ <b>không giữ đoạn nào cả</b> —
+                                    bật AI ở <b>Cấu hình AI</b>, hoặc bật Chuyển động ở{" "}
+                                    <b>Cấu hình AI → Chuyển động</b> nếu muốn chuyển động cũng
+                                    tính là sự kiện.
+                                </p>
+                            ) : (
+                                <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500">
+                                    Camera này đang bật phát hiện chuyển động, nên chuyển động
+                                    cũng được tính là sự kiện.
+                                </p>
+                            )}
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <HintLabel

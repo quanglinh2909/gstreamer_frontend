@@ -12,7 +12,6 @@ export interface ICameraCreate {
     preMotionSeconds: number,
     postMotionSeconds: number,
     segmentSeconds: number,
-    motionKeyframeOnly: boolean,
     /** Hạn lưu theo NGÀY của riêng camera này; 0 = không giới hạn.
      *  Engine chỉ cất hộ vào cột cameras.retention_days — bộ dọn dung lượng
      *  bên Python mới là chỗ thi hành (storage_cleanup_service.py). */
@@ -44,12 +43,17 @@ export interface IMotionGridPatch {
     /** Cũng chính là `gap=` của motioncells: im lặng bấy nhiêu giây thì kết thúc sự kiện. */
     postMotionSeconds?: number
     preMotionSeconds?: number
-    motionKeyframeOnly?: boolean
     recordingMode?: RecordingMode
     recordingEnabled?: boolean
 }
 
 // Bật/tắt ghi hình từ ngoài danh sách camera, không mở cả biểu mẫu sửa.
+//
+// recordingMode="motion" nghĩa là "CHỈ GIỮ đoạn có sự kiện" — nó KHÔNG bật dò
+// chuyển động. Bộ dò chuyển động chỉ chạy khi motionEnabled=true (Cấu hình AI →
+// Chuyển động). Trước đây engine gộp hai thứ: bật chế độ này là kéo theo cả
+// nhánh dò, đo được 29% CPU mỗi camera — mà camera chưa vẽ vùng thì nhánh đó
+// không thể sinh sự kiện nào, tức là đốt CPU để rồi xoá sạch mọi đoạn ghi.
 //
 // PHẢI gửi CẢ HAI trường. Engine coi `recordingMode != "off"` là đã bật ghi và
 // tự kéo `recordingEnabled` lên true (CameraStreamSession::normalizeRecordingFlag),
@@ -91,7 +95,6 @@ export interface ICameraResponse {
     preMotionSeconds: number
     postMotionSeconds: number
     segmentSeconds: number
-    motionKeyframeOnly: boolean
     retentionDays: number
     motionGridX: number
     motionGridY: number

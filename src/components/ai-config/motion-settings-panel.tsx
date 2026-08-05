@@ -184,12 +184,6 @@ export function MotionSettingsPanel({ editor }: { editor: MotionGridEditor }) {
                             checked={editor.saveEvents}
                             onChange={editor.setSaveEvents}
                         />
-                        <SwitchRow
-                            label="Chỉ xét khung khoá"
-                            description="Nhẹ CPU hơn nhưng phát hiện thưa hơn."
-                            checked={editor.keyframeOnly}
-                            onChange={editor.setKeyframeOnly}
-                        />
                     </div>
                 </section>
 

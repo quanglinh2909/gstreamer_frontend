@@ -138,7 +138,6 @@ export function useMotionGridEditor(camera: ICameraResponse | null, onSaved: () 
     const [enabled, setEnabled] = useState(() => Boolean(camera?.motionEnabled));
     const [preSeconds, setPreSeconds] = useState(() => String(camera?.preMotionSeconds ?? 5));
     const [postSeconds, setPostSeconds] = useState(() => String(camera?.postMotionSeconds ?? 5));
-    const [keyframeOnly, setKeyframeOnly] = useState(() => Boolean(camera?.motionKeyframeOnly));
     // Mặc định BẬT khi camera chưa có giá trị: giữ nguyên hành vi cũ, tắt là
     // lựa chọn có ý thức của người dùng.
     const [saveEvents, setSaveEvents] = useState(() => camera?.motionSaveEvents !== false);
@@ -156,7 +155,6 @@ export function useMotionGridEditor(camera: ICameraResponse | null, onSaved: () 
         setEnabled(Boolean(camera?.motionEnabled));
         setPreSeconds(String(camera?.preMotionSeconds ?? 5));
         setPostSeconds(String(camera?.postMotionSeconds ?? 5));
-        setKeyframeOnly(Boolean(camera?.motionKeyframeOnly));
         setSaveEvents(camera?.motionSaveEvents !== false);
         setRecordOnMotion(camera?.recordingMode === "motion");
         setMessage("");
@@ -259,7 +257,6 @@ export function useMotionGridEditor(camera: ICameraResponse | null, onSaved: () 
                 motionEnabled: enabled,
                 preMotionSeconds: Math.max(0, toNumber(preSeconds, 5)),
                 postMotionSeconds: Math.max(0, toNumber(postSeconds, 5)),
-                motionKeyframeOnly: keyframeOnly,
                 motionSaveEvents: saveEvents,
                 // Chỉ đụng tới chế độ ghi khi camera ĐANG ghi — không thì công
                 // tắc này vô nghĩa mà lại có nguy cơ bật ghi cho một camera
@@ -294,7 +291,6 @@ export function useMotionGridEditor(camera: ICameraResponse | null, onSaved: () 
         enabled,
         preSeconds,
         postSeconds,
-        keyframeOnly,
         saveEvents,
         recordingOn,
         recordOnMotion,
@@ -325,8 +321,6 @@ export function useMotionGridEditor(camera: ICameraResponse | null, onSaved: () 
         setPreSeconds,
         postSeconds,
         setPostSeconds,
-        keyframeOnly,
-        setKeyframeOnly,
         saveEvents,
         setSaveEvents,
         recordOnMotion,
