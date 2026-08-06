@@ -13,7 +13,9 @@ import {
 } from "@/components/common/detection-overlay";
 import { SpeedPicker } from "@/components/common/speed-picker";
 import { usePlaybackDetections } from "@/hooks/use-playback-detections";
+import { useMoqVideo } from "@/hooks/use-moq-video";
 import type { FeedTab } from "@/lib/event-feed-shared";
+import type { VideoTransport } from "@/lib/moq/transport";
 import { ICE_SERVERS } from "@/lib/webrtc-ice";
 
 // Player XEM LẠI chạy bằng WebRTC thay cho HLS.
@@ -89,6 +91,11 @@ export const PlaybackVideo = forwardRef<
         // danh sách sự kiện của ngày (đã tải sẵn cho timeline) rồi truyền xuống
         // — component này không biết gì về mốc giờ tường.
         motionCells?: MotionOverlayCells | null;
+        // Đường truyền. "moq" thay chặng WebRTC bằng QUIC/WebTransport và vẽ
+        // lên canvas; MỌI thứ còn lại (seek, tốc độ, tạm dừng, con trỏ
+        // timeline, lớp phủ AI) đi qua đúng /playback/{id} như cũ — engine
+        // không có đường điều khiển thứ hai.
+        transport?: VideoTransport;
     }
 >(function PlaybackVideo(
     {
@@ -106,6 +113,7 @@ export const PlaybackVideo = forwardRef<
         detectionTypes,
         detectionLabels = true,
         motionCells = null,
+        transport = "webrtc",
     },
     ref,
 ) {
@@ -194,6 +202,33 @@ export const PlaybackVideo = forwardRef<
         [],
     );
 
+    // Áp một bản tin trạng thái của engine. Ở PHẠM VI COMPONENT vì có hai
+    // nguồn gửi nó tới: kênh dữ liệu WebRTC (engine đẩy 500ms/lần) và vòng
+    // hỏi HTTP (đường MoQ không có kênh dữ liệu nào).
+    const applyStatus = useCallback(
+        (status: {
+            positionMs?: number;
+            ended?: boolean;
+            paused?: boolean;
+            waiting?: boolean;
+            seq?: number;
+        }) => {
+            // Bỏ qua mọi bản tin sinh ra TRƯỚC khi engine áp lệnh seek mới nhất.
+            if (waitSeqRef.current > 0) {
+                if ((status.seq ?? 0) < waitSeqRef.current) return;
+                waitSeqRef.current = 0;
+            }
+            if (typeof status.positionMs === "number") {
+                positionRef.current = status.positionMs;
+                onPositionRef.current(status.positionMs);
+                setOverlayMs(status.positionMs);
+            }
+            setEnded(Boolean(status.ended));
+            setWaiting(Boolean(status.waiting));
+        },
+        [],
+    );
+
     const doSeek = useCallback(
         (wallMsRaw: number) => {
             setWaiting(false);
@@ -248,7 +283,7 @@ export const PlaybackVideo = forwardRef<
     }, [rate, control]);
 
     useEffect(() => {
-        if (!cameraId) return;
+        if (!cameraId || transport !== "webrtc") return;
 
         const videoElement = videoRef.current;
         let cancelled = false;
@@ -322,27 +357,6 @@ export const PlaybackVideo = forwardRef<
                 peer.addEventListener("icecandidate", onCandidate);
                 armQuiet();
             });
-
-        const applyStatus = (status: {
-            positionMs?: number;
-            ended?: boolean;
-            paused?: boolean;
-            waiting?: boolean;
-            seq?: number;
-        }) => {
-            // Bỏ qua mọi bản tin sinh ra TRƯỚC khi engine áp lệnh seek mới nhất.
-            if (waitSeqRef.current > 0) {
-                if ((status.seq ?? 0) < waitSeqRef.current) return;
-                waitSeqRef.current = 0;
-            }
-            if (typeof status.positionMs === "number") {
-                positionRef.current = status.positionMs;
-                onPositionRef.current(status.positionMs);
-                setOverlayMs(status.positionMs);
-            }
-            setEnded(Boolean(status.ended));
-            setWaiting(Boolean(status.waiting));
-        };
 
         // LƯỚI AN TOÀN: chỉ chạy khi kênh dữ liệu im lặng. Xem DATACHANNEL_PROBE_MS.
         const startPolling = () => {
@@ -470,7 +484,80 @@ export const PlaybackVideo = forwardRef<
         };
         // startMs cố tình KHÔNG nằm trong deps: đổi mốc là gọi seek(), không
         // phải dựng lại cả phiên WebRTC.
-    }, [cameraId, control]);
+    }, [cameraId, control, transport]);
+
+    // ─── Đường MoQ ──────────────────────────────────────────────────────────
+    // Chỉ thay chặng VẬN CHUYỂN. Phiên bên engine vẫn là một PlaybackSource
+    // như WebRTC, vẫn nằm ở /playback/{id}, nên control()/doSeek()/tốc độ ở
+    // trên dùng lại nguyên vẹn — không có nhánh điều khiển thứ hai để lệch.
+    const moq = useMoqVideo({
+        cameraId,
+        mode: "playback",
+        enabled: transport === "moq" && Boolean(cameraId),
+        // Đọc LÚC MỞ phiên: nối lại giữa chừng phải tiếp ở chỗ đang xem chứ
+        // không nhảy về đầu.
+        getStartMs: useCallback(
+            () => Math.round(pendingSeekRef.current ?? positionRef.current),
+            [],
+        ),
+        getRate: useCallback(() => rateRef.current, []),
+        onSessionId: useCallback((sessionId: string) => {
+            sessionRef.current = `/playback/${sessionId}`;
+        }, []),
+    });
+
+    // Trạng thái của trình phát: lấy từ hook khi đang chạy MoQ.
+    useEffect(() => {
+        if (transport !== "moq") return;
+        setState(moq.state);
+        setErrorMessage(moq.errorMessage);
+    }, [transport, moq.state, moq.errorMessage]);
+
+    // Vị trí phát: MoQ không có kênh dữ liệu nên hỏi HTTP mỗi giây. Rẻ hơn
+    // nhiều so với nghe có vẻ — một GET vài trăm byte, và chỉ khi đang xem lại.
+    useEffect(() => {
+        if (transport !== "moq" || !cameraId) return;
+        let cancelled = false;
+        let timer = 0;
+        const tick = async () => {
+            if (cancelled) return;
+            const url = sessionRef.current;
+            if (url) {
+                try {
+                    const res = await fetch(`${PROXY}${url}`);
+                    if (res.status === 404) {
+                        // Engine đã dọn phiên (watchdog) — mở lại từ đầu.
+                        sessionRef.current = "";
+                        moq.restart();
+                    } else if (res.ok) {
+                        applyStatus(await res.json());
+                    }
+                } catch {
+                    /* mất mạng tạm thời: nhịp sau lo tiếp */
+                }
+            }
+            if (!cancelled) timer = window.setTimeout(tick, STATUS_POLL_MS);
+        };
+        timer = window.setTimeout(tick, STATUS_POLL_MS);
+        return () => {
+            cancelled = true;
+            window.clearTimeout(timer);
+        };
+    }, [transport, cameraId, applyStatus, moq]);
+
+    // Rời trang khi đang xem bằng MoQ: hook tự đóng WebTransport, nhưng phiên
+    // bên engine thì phải bảo nó dọn — máy chủ MoQ cũng gọi DELETE khi kết nối
+    // đứt, đây là lớp thứ hai cho ca trình duyệt đóng đột ngột.
+    useEffect(() => {
+        if (transport !== "moq") return;
+        return () => {
+            const url = sessionRef.current;
+            if (!url) return;
+            sessionRef.current = "";
+            void fetch(`${PROXY}${url}`, { method: "DELETE", keepalive: true })
+                .catch(() => {});
+        };
+    }, [transport]);
 
     const togglePlay = useCallback(() => {
         const next = !paused;
@@ -494,16 +581,28 @@ export const PlaybackVideo = forwardRef<
             ref={wrapRef}
             className={`group relative flex items-center justify-center bg-black ${className ?? ""}`}
         >
-            <video
-                ref={videoRef}
-                className="h-full w-full object-contain"
-                muted
-                autoPlay
-                playsInline
-                // Chế độ tường: bấm video KHÔNG tạm dừng (để cú bấm nổi lên ô
-                // cha chọn ô); phát/dừng do thanh chung của tường lo.
-                onClick={showChrome ? togglePlay : undefined}
-            />
+            {/* MoQ giải mã bằng WebCodecs nên khung hình đi ra <canvas>;
+                WebRTC thì vẫn là <video> như cũ. Hai thẻ KHÔNG cùng tồn tại —
+                thẻ nào không dùng vẫn giữ một tham chiếu ref sống và lớp phủ
+                AI sẽ đo nhầm vào thẻ rỗng. */}
+            {transport === "moq" ? (
+                <canvas
+                    ref={moq.canvasRef}
+                    className="h-full w-full object-contain"
+                    onClick={showChrome ? togglePlay : undefined}
+                />
+            ) : (
+                <video
+                    ref={videoRef}
+                    className="h-full w-full object-contain"
+                    muted
+                    autoPlay
+                    playsInline
+                    // Chế độ tường: bấm video KHÔNG tạm dừng (để cú bấm nổi lên ô
+                    // cha chọn ô); phát/dừng do thanh chung của tường lo.
+                    onClick={showChrome ? togglePlay : undefined}
+                />
+            )}
 
             {/* Khung phát hiện ĐÃ LƯU. Thẻ video ở đây luôn object-contain nên
                 lớp phủ dùng fit="contain" để trừ đúng phần viền đen. */}
@@ -511,7 +610,7 @@ export const PlaybackVideo = forwardRef<
                 <DetectionOverlay
                     motion={motionCells}
                     boxes={playbackBoxes}
-                    videoRef={videoRef}
+                    videoRef={transport === "moq" ? moq.canvasRef : videoRef}
                     fit="contain"
                     transform="none"
                     transition="none"

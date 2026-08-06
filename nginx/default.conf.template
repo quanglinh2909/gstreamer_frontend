@@ -62,3 +62,56 @@ server {
         proxy_send_timeout 3600s;
     }
 }
+
+# ─── Cổng HTTPS cho MẠNG LAN ────────────────────────────────────────────────
+# Chỉ tồn tại vì MoQ: WebTransport đòi secure context, mà http://<ip-lan>
+# không phải. Người xem qua tên miền công khai không dùng cổng này (TLS của họ
+# kết thúc ở ingress), nên khối http trên vẫn giữ nguyên, không đụng vào.
+#
+# Chứng chỉ tự ký -> lần đầu Chrome cảnh báo, bấm Advanced/Proceed một lần là
+# xong. Sinh bằng nginx/make-lan-cert.sh.
+server {
+    listen ${NGINX_TLS_PORT} ssl;
+    listen [::]:${NGINX_TLS_PORT} ssl;
+    http2 on;
+    server_name _;
+
+    ssl_certificate     /etc/nginx/certs/lan.crt;
+    ssl_certificate_key /etc/nginx/certs/lan.key;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+
+    client_max_body_size 50m;
+
+    location / {
+        proxy_pass http://127.0.0.1:${FRONTEND_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+    }
+
+    location /ws/ {
+        proxy_pass http://127.0.0.1:${PY_BACKEND_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
+    location /wsc/ {
+        proxy_pass http://127.0.0.1:${CPP_BACKEND_PORT}/ws/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+}

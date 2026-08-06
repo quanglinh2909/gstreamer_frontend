@@ -135,7 +135,10 @@ export function DetectionOverlay({
     // mới có; job chạy toàn khung thì rỗng.
     zones?: OverlayZone[];
     showZones?: boolean;
-    videoRef: React.RefObject<HTMLVideoElement | null>;
+    // Chấp nhận cả <canvas>: trình phát MoQ giải mã bằng WebCodecs nên vẽ
+    // lên canvas chứ không có thẻ <video> nào. Chỉ cần kích thước NGUỒN của
+    // ảnh, mà canvas cũng có (width/height).
+    videoRef: React.RefObject<HTMLVideoElement | HTMLCanvasElement | null>;
     fit: "fill" | "contain";
     transform: string;
     transition: string;
@@ -165,8 +168,8 @@ export function DetectionOverlay({
             setRect({ left: 0, top: 0, width: cw, height: ch });
             return;
         }
-        const vw = video?.videoWidth ?? 0;
-        const vh = video?.videoHeight ?? 0;
+        const vw = video ? ("videoWidth" in video ? video.videoWidth : video.width) : 0;
+        const vh = video ? ("videoHeight" in video ? video.videoHeight : video.height) : 0;
         if (vw <= 0 || vh <= 0) {
             // Chưa biết kích thước video (chưa có metadata) — tạm coi khít thẻ.
             setRect({ left: 0, top: 0, width: cw, height: ch });

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ZoomIn, ZoomOut } from "lucide-react";
 import type { MotionEvent, RecordingSegment } from "@/lib/recordings";
 import { thumbnailUrl } from "@/lib/recordings";
@@ -321,6 +321,44 @@ export function Timeline({
     const visible = <T extends { startMs: number; endMs: number }>(items: T[]) =>
         items.filter((it) => it.endMs > windowStart && it.startMs < windowEnd);
 
+    // Gộp các đoạn ghi LIỀN NHAU thành một khối trước khi vẽ.
+    //
+    // Vì sao: camera ghi liên tục cắt file mỗi ~58 giây, một ngày ra hơn nghìn
+    // đoạn. Ở khung 8 giờ, mỗi đoạn chỉ rộng ~1px và cạnh của nó rơi vào GIỮA
+    // pixel; trình duyệt vẽ từng khối riêng nên pixel biên chỉ được phủ một
+    // phần rồi pha với nền tối. Hàng trăm vạch hơi tối chu kỳ ~1px đập với lưới
+    // điểm ảnh thành những "nét đứt" thấy rõ — trông như mất dữ liệu trong khi
+    // dữ liệu liền mạch. (Đo hình học DOM: 538 khối, lỗ hổng lớn nhất 0,05px.)
+    //
+    // Ngưỡng gộp = bề rộng MỘT pixel quy ra thời gian, sàn 1 giây: khe nhỏ hơn
+    // một pixel thì có vẽ cũng không thấy, còn mốc giờ trong DB chỉ chính xác
+    // tới giây nên khe "1 giây" giữa hai file chỉ là làm tròn. Phóng sâu vào
+    // thì ngưỡng tự nhỏ lại và khe hở thật lại hiện ra.
+    const blocks = useMemo(() => {
+        const tol = Math.max(1_000, span / Math.max(1, trackWidth));
+        const list = segments
+            .filter((s) => s.endMs > windowStart && s.startMs < windowEnd)
+            .sort((a, b) => a.startMs - b.startMs);
+        const out: { key: string; startMs: number; endMs: number; live: boolean }[] = [];
+        for (const seg of list) {
+            // Chỉ coi là "đang ghi" (dải emerald kéo tới bây giờ) khi đoạn
+            // recording THẬT SỰ mới. Hàng 'recording' mồ côi (ghi bị tắt/treo
+            // trước đó) start cách xa hiện tại -> vẽ như đoạn thường tới endMs
+            // của nó, KHÔNG kéo dài tới now (nếu không dải xanh giả kéo suốt
+            // tới giờ, bấm vào lại lỗi).
+            const live = seg.status === "recording" && nowMs - seg.startMs < 120_000;
+            const endMs = live ? nowMs : seg.endMs;
+            const prev = out[out.length - 1];
+            // Khối live màu khác nên không gộp chung với đoạn đã đóng.
+            if (prev && !live && !prev.live && seg.startMs - prev.endMs <= tol) {
+                if (endMs > prev.endMs) prev.endMs = endMs;
+                continue;
+            }
+            out.push({ key: seg.id, startMs: seg.startMs, endMs, live });
+        }
+        return out;
+    }, [segments, windowStart, windowEnd, span, nowMs, trackWidth]);
+
     const playheadVisible =
         playheadMs != null && playheadMs >= windowStart && playheadMs <= windowEnd;
     // Bong bóng giờ kẹp vào trong mép để không tràn ra ngoài khung.
@@ -430,22 +468,15 @@ export function Timeline({
                             style={{ left: `${pct(t)}%` }}
                         />
                     ))}
-                    {visible(segments).map((seg) => {
-                        // Chỉ coi là "đang ghi" (dải emerald kéo tới bây giờ) khi
-                        // đoạn recording THẬT SỰ mới. Hàng 'recording' mồ côi (ghi
-                        // bị tắt/treo trước đó) start cách xa hiện tại -> vẽ như
-                        // đoạn thường tới endMs ước lượng, KHÔNG kéo dài tới now
-                        // (nếu không dải xanh giả kéo suốt tới giờ, bấm vào lại lỗi).
-                        const live = seg.status === "recording" && nowMs - seg.startMs < 120_000;
-                        const endMs = live ? nowMs : seg.endMs;
-                        const left = pct(seg.startMs);
-                        const width = pct(endMs) - left;
+                    {blocks.map((b) => {
+                        const left = pct(b.startMs);
+                        const width = pct(b.endMs) - left;
                         return (
                             <div
-                                key={seg.id}
+                                key={b.key}
                                 className={
                                     "absolute inset-y-0 " +
-                                    (live ? "bg-emerald-400" : "bg-green-500")
+                                    (b.live ? "bg-emerald-400" : "bg-green-500")
                                 }
                                 style={{ left: `${left}%`, width: `${Math.max(0.1, width)}%` }}
                             />

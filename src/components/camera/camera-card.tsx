@@ -10,6 +10,8 @@ import {
     Trash2,
 } from "lucide-react";
 import { WebRtcPlayer } from "@/components/common/webrtc-player";
+import { MoqPlayer } from "@/components/common/moq-player";
+import { useVideoTransport } from "@/lib/moq/transport";
 import type { ICameraResponse } from "@/interface/camera";
 import type { RecordingToggleKind } from "./recording-toggle-modal";
 import { formatCameraDate, getCameraHealth } from "@/lib/camera-view-model";
@@ -54,6 +56,7 @@ export function CameraCard({
     // phải một cờ thứ hai. Engine chỉ vứt-rồi-giữ-lại đoạn ở chế độ đó, nên
     // thêm một cờ riêng là tạo ra hai nguồn sự thật cho cùng một hành vi.
     const eventOnly = camera.recordingMode === "motion";
+    const { transport } = useVideoTransport();
     const [isLive, setIsLive] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     // Phóng to cả khối preview chứ không riêng thẻ <video>: có vậy nhãn trạng
@@ -108,7 +111,11 @@ export function CameraCard({
                     // Chỉ dựng player khi người dùng bấm xem: mỗi player là một
                     // phiên WebRTC + một kết nối RTSP tới engine, mở sẵn cho cả
                     // lưới camera sẽ tốn băng thông vô ích.
-                    <WebRtcPlayer cameraId={camera.id} className="absolute inset-0" />
+                    transport === "moq" ? (
+                        <MoqPlayer cameraId={camera.id} className="absolute inset-0" />
+                    ) : (
+                        <WebRtcPlayer cameraId={camera.id} className="absolute inset-0" />
+                    )
                 ) : (
                     // Cả vùng preview là một nút: bấm đâu cũng xem được, không
                     // phải nhắm đúng một nút nhỏ giữa khung.

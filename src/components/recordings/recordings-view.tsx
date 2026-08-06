@@ -24,6 +24,9 @@ import {
 import { ALL_TABS, type FeedTab } from "@/lib/event-feed-shared";
 import type { ICameraResponse } from "@/interface/camera";
 import { WebRtcPlayer } from "@/components/common/webrtc-player";
+import { MoqPlayer } from "@/components/common/moq-player";
+import { TransportToggle } from "@/components/common/transport-toggle";
+import { useVideoTransport } from "@/lib/moq/transport";
 import {
     fetchMotionEvents,
     fetchSegments,
@@ -59,6 +62,24 @@ function toDateInputValue(ms: number): string {
 // chừa khoảng trống tương lai phía trước — đúng kiểu đầu ghi.
 function liveWindow(nowMs: number, span: number): [number, number] {
     return [nowMs - span, nowMs];
+}
+const DAY_MS = 24 * 3_600_000;
+
+// Thay dữ liệu của ĐÚNG khoảng vừa nạp, giữ nguyên phần nằm ngoài khoảng.
+//
+// Không thay sạch danh sách: timeline có thể đang hiện nhiều ngày cùng lúc
+// (kéo thanh lùi qua nửa đêm), thay sạch là ngày kia biến mất. Cũng không gộp
+// theo id suông: lần nạp lại của một ngày còn có việc BỎ các đoạn đã bị dọn
+// theo hạn mức dung lượng — gộp suông thì chúng sống mãi trên thanh.
+function mergeRange<T extends { startMs: number; endMs: number }>(
+    prev: T[],
+    next: T[],
+    fromMs: number,
+    toMs: number,
+): T[] {
+    return [...prev.filter((it) => it.endMs < fromMs || it.startMs > toMs), ...next].sort(
+        (a, b) => a.startMs - b.startMs,
+    );
 }
 
 export function RecordingsView({
@@ -98,6 +119,7 @@ export function RecordingsView({
     // "live" = đang xem trực tiếp (mặc định khi vào); bấm vào timeline mới
     // chuyển sang "playback" xem bản ghi; nút LIVE quay về trực tiếp.
     const [mode, setMode] = useState<"live" | "playback">("live");
+    const { transport } = useVideoTransport();
     const [dayMs, setDayMs] = useState<number>(() => startOfDay(Date.now()));
     const [segments, setSegments] = useState<RecordingSegment[]>([]);
     const [motion, setMotion] = useState<MotionEvent[]>([]);
@@ -191,6 +213,9 @@ export function RecordingsView({
     // Mốc chờ nhảy tới sau khi ĐỔI NGÀY (bấm một sự kiện ở ngày khác): đoạn ghi
     // của ngày mới nạp bất đồng bộ, seek được áp khi segments về (effect dưới).
     const pendingSeekRef = useRef<number | null>(null);
+    // Những ngày (mốc 00:00) đã nạp cho camera đang xem, để khỏi gọi lại.
+    const loadedDaysRef = useRef<Set<number>>(new Set());
+    const loadedCamRef = useRef<string | null>(null);
     // Vào chế độ xem lại tại một mốc giờ tường.
     //
     // Phiên WebRTC chỉ mở MỘT LẦN: nếu đang xem lại rồi thì cú bấm này chỉ là
@@ -201,13 +226,13 @@ export function RecordingsView({
         (wallMs: number, segs?: RecordingSegment[]) => {
             if (!selectedId) return;
             const source = segs ?? segmentsRef.current;
-            // Không có đoạn ghi nào PHỦ mốc này -> chẳng có gì để phát, về
-            // live. Dùng chung phép kiểm với `jumpOrWarn`: hai phép kiểm khác
-            // nhau thì sẽ có ca cảnh báo hiện ra mà vẫn nhảy, hoặc ngược lại.
-            if (!segmentCovering(source, wallMs)) {
-                setMode("live");
-                return;
-            }
+            // Không có đoạn ghi nào PHỦ mốc này -> chẳng có gì để phát, KHÔNG
+            // làm gì cả: giữ nguyên thứ đang xem. Trước đây chỗ này rơi về LIVE
+            // — bấm hụt vào một khe hở khi đang xem lại là bị quăng về hiện tại,
+            // mất luôn mốc đang xem dở. Dùng chung phép kiểm với `jumpOrWarn`:
+            // hai phép kiểm khác nhau thì sẽ có ca cảnh báo hiện ra mà vẫn
+            // nhảy, hoặc ngược lại.
+            if (!segmentCovering(source, wallMs)) return;
             setPlayMs(wallMs);
             if (modeRef.current === "playback" && playerRef.current) {
                 playerRef.current.seek(wallMs);
@@ -317,6 +342,22 @@ export function RecordingsView({
         [router],
     );
 
+    // Tắt camera đang xem: gỡ phiên WebRTC/MoQ và trả trang về màn hình chọn.
+    //
+    // Vì sao ĐÁNG CÓ chứ không chỉ cho gọn: một phiên xem đang mở tốn khoảng
+    // 9 điểm CPU (WebRTC) tới 19 điểm (MoQ) trên board này, và giữ một nguồn
+    // RTSP/ PlaybackSource sống. Không có nút tắt thì cách duy nhất để nhả nó
+    // là rời hẳn trang — người xem xong một camera rồi để đó là trả tiền CPU
+    // cho một khung hình không ai nhìn.
+    const closeCamera = useCallback(() => {
+        setSelectedId(null);
+        setMode("live");
+        setRegionSearch(false);
+        const { id: _drop, ...rest } = router.query;
+        void router.replace({ pathname: router.pathname, query: rest }, undefined,
+                            { shallow: true });
+    }, [router]);
+
     // Khôi phục camera từ `?id=` đúng MỘT lần, và chỉ khi id đó có thật trong
     // danh sách — link cũ trỏ tới camera đã xoá thì rơi về màn hình "chọn
     // camera" chứ không dựng phiên tới một id không tồn tại.
@@ -352,6 +393,13 @@ export function RecordingsView({
     useEffect(() => {
         if (!selectedId) return;
         let cancelled = false;
+        // Đổi CAMERA thì xoá sạch; đổi ngày thì giữ (các ngày đã nạp vẫn đúng).
+        if (loadedCamRef.current !== selectedId) {
+            loadedCamRef.current = selectedId;
+            loadedDaysRef.current.clear();
+            setSegments([]);
+            setMotion([]);
+        }
 
         // fit=true chỉ ở lần nạp đầu (đổi camera/ngày): co khung timeline ôm
         // sát vùng có ghi thay vì 6h trống phía trước. Lần làm mới định kỳ
@@ -362,8 +410,9 @@ export function RecordingsView({
                 fetchMotionEvents(selectedId, dayStart, dayEnd),
             ]);
             if (cancelled) return;
-            setSegments(segs);
-            setMotion(evs);
+            setSegments((prev) => mergeRange(prev, segs, dayStart, dayEnd));
+            setMotion((prev) => mergeRange(prev, evs, dayStart, dayEnd));
+            loadedDaysRef.current.add(dayStart);
             // Co khung timeline ôm sát vùng có ghi của NGÀY đang chọn — KHÔNG
             // đụng tới video/mode. Chọn ngày chỉ để XEM timeline; muốn xem lại
             // thì bấm vào timeline, muốn xem trực tiếp thì bấm nút LIVE.
@@ -410,6 +459,50 @@ export function RecordingsView({
             if (tailTimer) window.clearInterval(tailTimer);
         };
     }, [selectedId, dayStart, dayEnd, isToday]);
+
+    // Nạp thêm những NGÀY mà khung timeline đang chạm tới.
+    //
+    // Trước đây chỉ nạp đúng ngày chọn ở ô lịch: kéo thanh timeline lùi qua nửa
+    // đêm là phần của hôm qua trống trơn — trông như không có bản ghi, trong
+    // khi chọn đúng ngày đó ở ô lịch thì lại thấy đủ. Giờ ngày nào lọt vào
+    // khung thì nạp ngày đó, mỗi ngày đúng một lần cho tới khi đổi camera.
+    const [winStart, winEnd] = window_;
+    useEffect(() => {
+        if (!selectedId) return;
+        const missing: number[] = [];
+        for (let d = startOfDay(winStart); d <= winEnd; d += DAY_MS) {
+            if (!loadedDaysRef.current.has(d)) missing.push(d);
+        }
+        if (missing.length === 0) return;
+        let cancelled = false;
+        // Đợi khung đứng yên rồi mới gọi: kéo thanh quét qua nhiều ngày liền
+        // thì không bắn một loạt truy vấn cả-ngày.
+        const timer = window.setTimeout(async () => {
+            for (const d of missing) {
+                if (cancelled) return;
+                if (loadedDaysRef.current.has(d)) continue;
+                // Đánh dấu TRƯỚC để hai lần chạy chồng nhau không gọi đôi.
+                loadedDaysRef.current.add(d);
+                const to = d + DAY_MS;
+                try {
+                    const [segs, evs] = await Promise.all([
+                        fetchSegments(selectedId, d, to),
+                        fetchMotionEvents(selectedId, d, to),
+                    ]);
+                    if (cancelled) return;
+                    setSegments((prev) => mergeRange(prev, segs, d, to));
+                    setMotion((prev) => mergeRange(prev, evs, d, to));
+                } catch {
+                    // Hỏng mạng thì bỏ dấu để lần kéo sau nạp lại.
+                    loadedDaysRef.current.delete(d);
+                }
+            }
+        }, 400);
+        return () => {
+            cancelled = true;
+            window.clearTimeout(timer);
+        };
+    }, [selectedId, winStart, winEnd]);
 
     // Bấm/kéo-thả timeline: xem bản ghi tại mốc đó. Bấm sát "bây giờ" (chưa có
     // bản ghi để phát) thì về live.
@@ -510,14 +603,25 @@ export function RecordingsView({
                             <button
                                 key={cam.id}
                                 type="button"
+                                // Bấm lại camera ĐANG xem = tắt nó. Đây là
+                                // đường tắt camera duy nhất ở khổ điện thoại,
+                                // nơi nút Tắt trên thanh công cụ bị ẩn.
                                 onClick={() => {
-                                    pickCamera(cam.id);
-                                    // Ngăn kéo che hết khung xem trên mobile.
                                     setCamListOpen(false);
+                                    if (cam.id === selectedId) {
+                                        closeCamera();
+                                        return;
+                                    }
+                                    pickCamera(cam.id);
                                     setMode("live");
                                     setDayMs(startOfDay(Date.now()));
                                     setWindow(([s, e]) => liveWindow(Date.now(), e - s));
                                 }}
+                                title={
+                                    cam.id === selectedId
+                                        ? "Bấm để tắt camera này"
+                                        : "Xem camera này"
+                                }
                                 className={
                                     "flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm transition-colors " +
                                     (cam.id === selectedId
@@ -654,6 +758,10 @@ export function RecordingsView({
                                     onMotionVisibleChange={setShowMotionCells}
                                 />
                             </div>
+                            {/* Đường truyền video. Component tự thu thành MỘT
+                                nút ở khổ hẹp nên hiện được cả trên điện thoại. */}
+                            <TransportToggle />
+
                             <button
                                 type="button"
                                 onClick={() => setEventsPanelOpen((v) => !v)}
@@ -721,20 +829,55 @@ export function RecordingsView({
                                 </div>
                             ) : null}
 
+                            {/* Tắt camera: ĐÈ lên khung hình góc trên phải, chứ
+                                không nằm trên thanh công cụ — thanh đó ở 390px
+                                chỉ còn 12px trống (đo được), thêm một nút là đẩy
+                                nút cuối ra ngoài màn. Đè lên hình thì mọi khổ
+                                màn hình đều bấm được và luôn ở cùng một chỗ.
+
+                                z-30: trên player và lớp phủ AI, nhưng DƯỚI thông
+                                báo thoáng qua (z-40) để không che mất lỗi. */}
+                            <button
+                                type="button"
+                                onClick={closeCamera}
+                                title="Tắt camera này (dừng phiên xem)"
+                                aria-label="Tắt camera đang xem"
+                                className="absolute right-3 top-3 z-30 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/20 bg-black/55 text-white backdrop-blur transition-colors hover:border-rose-400/60 hover:bg-rose-500/70"
+                            >
+                                <X size={15} aria-hidden="true" />
+                            </button>
+
                             {mode === "live" ? (
-                                <WebRtcPlayer
-                                    cameraId={selectedId}
-                                    className="h-full w-full"
-                                    fit="contain"
-                                    detectionOrigin={eventWsOrigin}
-                                    showDetections={showBoxes}
-                                    detectionTypes={boxTypes}
-                                    detectionZonesVisible={showZones}
-                                    motionCells={motionOverlay}
-                                />
+                                transport === "moq" ? (
+                                    <MoqPlayer
+                                        cameraId={selectedId}
+                                        className="h-full w-full"
+                                        fit="contain"
+                                        detectionOrigin={eventWsOrigin}
+                                        showDetections={showBoxes}
+                                        detectionTypes={boxTypes}
+                                        detectionZonesVisible={showZones}
+                                        motionCells={motionOverlay}
+                                    />
+                                ) : (
+                                    <WebRtcPlayer
+                                        cameraId={selectedId}
+                                        className="h-full w-full"
+                                        fit="contain"
+                                        detectionOrigin={eventWsOrigin}
+                                        showDetections={showBoxes}
+                                        detectionTypes={boxTypes}
+                                        detectionZonesVisible={showZones}
+                                        motionCells={motionOverlay}
+                                    />
+                                )
                             ) : (
                                 <PlaybackVideo
-                                    key={selectedId}
+                                    // key có transport: đổi đường truyền phải
+                                    // dựng lại player, không thể vá nóng giữa
+                                    // một <video> và một <canvas>.
+                                    key={`${selectedId}:${transport}`}
+                                    transport={transport}
                                     ref={playerRef}
                                     cameraId={selectedId}
                                     startMs={playbackStartMs}

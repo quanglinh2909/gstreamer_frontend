@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, MousePointerClick, Search, X } from "lucide-react";
-import { AI_TYPE_TO_TAB, cn, TYPE_META } from "@/lib/event-feed-shared";
+import { MotionFeedRow } from "@/components/common/motion-feed-row";
+import { AI_TYPE_TO_TAB, cn, MOTION_META, TYPE_META } from "@/lib/event-feed-shared";
 
 // "Tìm theo vùng": kéo một hình chữ nhật lên hình, hệ thống trả về những gì
 // ĐÃ ĐI QUA vùng đó trong khoảng thời gian đang xem trên timeline.
@@ -10,7 +11,11 @@ import { AI_TYPE_TO_TAB, cn, TYPE_META } from "@/lib/event-feed-shared";
 //   RegionSearchLayer — lớp bắt kéo chuột đè lên video
 //   RegionSearchPanel — panel phải, thay chỗ bảng sự kiện khi đang tìm
 //
-// Chỉ có dữ liệu nếu cấu hình AI của camera đã bật "Lưu khung phát hiện".
+// Hai nguồn dữ liệu, backend trộn sẵn vào một danh sách:
+//   * AI — chỉ có nếu cấu hình AI của camera đã bật "Lưu khung phát hiện";
+//   * CHUYỂN ĐỘNG (ai_type="motion") — chỉ có nếu camera bật dò chuyển động.
+// Camera tắt cả hai thì tìm theo vùng luôn ra danh sách rỗng, và đó là lý do
+// dòng "không có gì" bên dưới phải nói cả hai điều kiện.
 
 export type RegionHit = {
     tid: number | null;
@@ -20,7 +25,14 @@ export type RegionHit = {
     t_end: number;
     best_score?: number | null;
     bbox: number[];
+    // ---- Chỉ kết quả CHUYỂN ĐỘNG mới có ----
+    event_id?: string | null;
+    cells?: string | null;
+    grid_x?: number | null;
+    grid_y?: number | null;
 };
+
+export const MOTION_AI_TYPE = "motion";
 
 type Rect = { x1: number; y1: number; x2: number; y2: number };
 
@@ -35,10 +47,12 @@ function fmtDur(ms: number) {
     return s < 60 ? `${s}s` : `${Math.floor(s / 60)}p${String(s % 60).padStart(2, "0")}`;
 }
 function typeLabel(aiType?: string | null) {
+    if (aiType === MOTION_AI_TYPE) return MOTION_META.label;
     const tab = aiType ? AI_TYPE_TO_TAB[aiType] : undefined;
     return tab ? TYPE_META[tab].label : aiType || "Khác";
 }
 function typeBadge(aiType?: string | null) {
+    if (aiType === MOTION_AI_TYPE) return MOTION_META.badge;
     const tab = aiType ? AI_TYPE_TO_TAB[aiType] : undefined;
     return tab ? TYPE_META[tab].badge : "bg-slate-700/40 text-slate-300 ring-slate-600";
 }
@@ -91,7 +105,9 @@ export function useRegionSearch(cameraId: string, fromMs: number, toMs: number) 
         setRange(null);
     }, []);
 
-    return { rect, hits, loading, error, range, search, reset };
+    // cameraId đi kèm state: panel cần nó để dựng URL ảnh sự kiện chuyển
+    // động, mà panel chỉ nhận `state` chứ không nhận từng tham số.
+    return { cameraId, rect, hits, loading, error, range, search, reset };
 }
 
 // ---------------------------------------------------------------- lớp kéo
@@ -263,7 +279,7 @@ export function RegionSearchPanel({
     onPick: (timestampSec: number) => void;
     onClose: () => void;
 }) {
-    const { rect, hits, loading, error, range } = state;
+    const { cameraId, rect, hits, loading, error, range } = state;
 
     return (
         <aside
@@ -315,8 +331,10 @@ export function RegionSearchPanel({
                     </p>
                 ) : hits && hits.length === 0 ? (
                     <p className="px-4 py-6 text-center text-xs text-slate-500">
-                        Không có gì đi qua vùng này trong khoảng đang xem. Nếu camera chưa
-                        bật &quot;Lưu khung phát hiện&quot; thì sẽ không có dữ liệu.
+                        Không có gì đi qua vùng này trong khoảng đang xem. Vùng tìm dựa
+                        trên hai nguồn: khung AI (cần bật &quot;Lưu khung phát hiện&quot;)
+                        và sự kiện chuyển động (cần bật dò chuyển động) — camera tắt cả
+                        hai thì luôn không có dữ liệu.
                     </p>
                 ) : (
                     <>
@@ -324,14 +342,36 @@ export function RegionSearchPanel({
                             {hits?.length} kết quả · mới nhất trước
                         </p>
                         <ul className="flex flex-col gap-2 p-3 pt-1">
-                            {hits?.map((h, i) => (
-                                <HitRow
-                                    key={`${h.tid}-${h.t_start}-${i}`}
-                                    hit={h}
-                                    region={rect}
-                                    onPick={() => onPick(h.t_start / 1000)}
-                                />
-                            ))}
+                            {hits?.map((h, i) =>
+                                h.ai_type === MOTION_AI_TYPE ? (
+                                    /* Chuyển động có ẢNH THẬT engine đã chụp,
+                                       nên dùng lại đúng thẻ của bảng sự kiện
+                                       thay vì vẽ sơ đồ — cùng ảnh, cùng lớp
+                                       phủ ô, cùng đường lùi thumbnail. */
+                                    <li key={`m-${h.event_id ?? h.t_start}-${i}`}>
+                                        <MotionFeedRow
+                                            cameraId={cameraId}
+                                            eventId={h.event_id ?? undefined}
+                                            startMs={h.t_start}
+                                            endMs={h.t_end}
+                                            cells={h.cells ?? ""}
+                                            gridX={h.grid_x ?? 32}
+                                            gridY={h.grid_y ?? 32}
+                                            cellCount={
+                                                h.cells ? h.cells.split(",").length : 0
+                                            }
+                                            onSeek={() => onPick(h.t_start / 1000)}
+                                        />
+                                    </li>
+                                ) : (
+                                    <HitRow
+                                        key={`${h.tid}-${h.t_start}-${i}`}
+                                        hit={h}
+                                        region={rect}
+                                        onPick={() => onPick(h.t_start / 1000)}
+                                    />
+                                ),
+                            )}
                         </ul>
                     </>
                 )}

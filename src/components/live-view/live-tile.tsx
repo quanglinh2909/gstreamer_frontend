@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Maximize2, Minimize2, MonitorPlay, X } from "lucide-react";
 import { WebRtcPlayer } from "@/components/common/webrtc-player";
+import { MoqPlayer } from "@/components/common/moq-player";
+import { useVideoTransport } from "@/lib/moq/transport";
 import type { MotionOverlayCells } from "@/components/common/detection-overlay";
 import { PlaybackVideo } from "@/components/recordings/playback-video";
 import type { ICameraResponse } from "@/interface/camera";
@@ -68,6 +70,7 @@ export function LiveTile({
     className?: string;
 }) {
     const tileRef = useRef<HTMLDivElement>(null);
+    const { transport } = useVideoTransport();
     const [isFullscreen, setIsFullscreen] = useState(false);
     // Ảnh trong ô đang được phóng to thì ô KHÔNG kéo được nữa, để cử chỉ giữ
     // chuột thuộc về việc rê ảnh. Bỏ zoom về 1x là ô kéo được trở lại.
@@ -167,18 +170,25 @@ export function LiveTile({
                             className="h-full w-full"
                         />
                     ) : (
-                        <WebRtcPlayer
-                            cameraId={camera.id}
-                            className="h-full w-full"
-                            onZoomedChange={setIsZoomed}
-                            detectionOrigin={detectionOrigin}
-                            showDetections={showDetections}
-                            detectionTypes={detectionTypes}
-                            detectionZonesVisible={detectionZonesVisible}
-                            motionCells={motionCells}
-                            // Ô trên tường nhỏ, nhãn chữ che mất hình — chỉ vẽ khung.
-                            detectionLabels={false}
-                        />
+                        // Hai trình phát cùng bộ prop nên đổi đường truyền chỉ
+                        // là đổi component; phần còn lại của ô không biết gì.
+                        (() => {
+                            const Player = transport === "moq" ? MoqPlayer : WebRtcPlayer;
+                            return (
+                                <Player
+                                    cameraId={camera.id}
+                                    className="h-full w-full"
+                                    onZoomedChange={setIsZoomed}
+                                    detectionOrigin={detectionOrigin}
+                                    showDetections={showDetections}
+                                    detectionTypes={detectionTypes}
+                                    detectionZonesVisible={detectionZonesVisible}
+                                    motionCells={motionCells}
+                                    // Ô trên tường nhỏ, nhãn chữ che mất hình — chỉ vẽ khung.
+                                    detectionLabels={false}
+                                />
+                            );
+                        })()
                     )}
 
                     {/* Thanh tiêu đề chỉ hiện khi rê chuột: xem tường 16 ô mà ô

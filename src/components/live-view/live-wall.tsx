@@ -37,6 +37,7 @@ import {
 import { Timeline } from "@/components/recordings/timeline";
 import { LiveTile } from "./live-tile";
 import { DetectionFilter } from "@/components/common/detection-filter";
+import { TransportToggle } from "@/components/common/transport-toggle";
 import { ALL_TABS, type FeedTab } from "@/lib/event-feed-shared";
 import { EventFeedPanel } from "./event-feed-panel";
 import { useLiveViewers } from "@/hooks/use-live-viewers";
@@ -983,6 +984,8 @@ export function LiveWall({
                             motionVisible={showMotionCells}
                             onMotionVisibleChange={setShowMotionCells}
                         />
+                        {/* Đường truyền video, dùng chung với trang Xem lại. */}
+                        <TransportToggle />
                         <button
                             type="button"
                             onClick={() => setEventsPanelOpen((v) => !v)}

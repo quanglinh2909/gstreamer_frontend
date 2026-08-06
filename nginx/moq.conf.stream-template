@@ -1,0 +1,31 @@
+# Proxy UDP cho MoQ (QUIC/WebTransport).
+#
+# VÌ SAO CẦN, VÀ VÌ SAO KHÔNG PHẢI VÌ LÝ DO BẠN NGHĨ:
+#
+# Đây KHÔNG phải cách để lách việc mở cổng trên router. Gói UDP vẫn phải đi
+# được từ Internet vào máy này; nginx không tạo ra đường nào cả. Cái nó giải
+# quyết là chuyện khác: máy chủ MoQ chạy bằng tiến trình Python KHÔNG có
+# quyền root nên không bind được cổng dưới 1024, mà cổng UDP dễ sống nhất qua
+# tường lửa lại đúng là 443 (mọi nơi đều quen với QUIC/HTTP-3 ở đó). nginx
+# chạy root trong container, bind 443/udp hộ rồi đẩy về 4443.
+#
+# UDP 443 KHÔNG đụng TCP 443 mà khối http phía dưới đang dùng — hai giao thức
+# tách biệt hoàn toàn dù trùng số cổng.
+#
+# Không dùng được với proxy_pass qua tên miền có nhiều IP: QUIC cần mọi gói
+# của một kết nối về đúng một đích, nên trỏ thẳng 127.0.0.1.
+server {
+    listen ${MOQ_PUBLIC_UDP_PORT} udp reuseport;
+    listen [::]:${MOQ_PUBLIC_UDP_PORT} udp reuseport;
+
+    proxy_pass 127.0.0.1:${MOQ_PORT};
+
+    # KHÔNG đặt proxy_responses: mặc định là "không giới hạn số gói trả về".
+    # Đặt một con số là nginx đóng phiên sau đúng ngần ấy gói, tức luồng video
+    # đứng sau vài khung hình đầu.
+    #
+    # proxy_timeout là thời gian một "phiên" UDP được giữ khi IM LẶNG. Luồng
+    # video thì chảy liên tục nên hiếm khi chạm; để rộng cho lúc người xem tạm
+    # dừng bản ghi mà vẫn giữ nguyên kết nối.
+    proxy_timeout 10m;
+}
